@@ -147,12 +147,16 @@ class MockQueryBuilder {
   _order: any = null;
   _limit: number | null = null;
   _single: boolean = false;
+  
+  _operation: 'select' | 'insert' | 'update' | 'delete' | 'upsert' = 'select';
+  _payload: any = null;
 
   constructor(table: string) {
     this.table = table;
   }
 
   select(columns: string = '*', options?: any) {
+    this._operation = 'select';
     if (options?.count) this.filters.push({ type: 'count' });
     return this;
   }
@@ -177,61 +181,87 @@ class MockQueryBuilder {
     return this;
   }
 
-  async insert(data: any | any[]) {
-    const db = getLocalDB();
-    if (!db[this.table]) db[this.table] = [];
-    
-    const items = Array.isArray(data) ? data : [data];
-    const newItems = items.map((item: any) => ({
-      ...item,
-      id: item.id || Math.random().toString(36).substr(2, 9),
-      created_at: new Date().toISOString()
-    }));
-    
-    db[this.table].push(...newItems);
-    saveLocalDB(db);
-    return { data: newItems, error: null };
+  insert(data: any | any[]) {
+    this._operation = 'insert';
+    this._payload = data;
+    return this;
   }
 
-  async update(data: any) {
-    const db = getLocalDB();
-    if (!db[this.table]) return { data: null, error: { message: `Table ${this.table} not found` } };
-
-    const filterEq = this.filters.find(f => f.type === 'eq');
-    if (!filterEq) return { data: null, error: { message: "Update requires a filter" } };
-
-    let updatedCount = 0;
-    db[this.table] = db[this.table].map((row: any) => {
-      if (row[filterEq.column] === filterEq.value) {
-        updatedCount++;
-        return { ...row, ...data };
-      }
-      return row;
-    });
-
-    saveLocalDB(db);
-    return { data: { count: updatedCount }, error: null };
+  update(data: any) {
+    this._operation = 'update';
+    this._payload = data;
+    return this;
   }
 
-  async upsert(data: any, options?: any) {
+  upsert(data: any, options?: any) {
+    this._operation = 'upsert';
+    this._payload = data;
+    return this;
+  }
+
+  async then(resolve: any, reject: any) {
     const db = getLocalDB();
-    if (!db[this.table]) db[this.table] = [];
 
-    const item = data;
-    const existingIdx = db[this.table].findIndex((r: any) => r.id === item.id);
-
-    if (existingIdx >= 0) {
-      db[this.table][existingIdx] = { ...db[this.table][existingIdx], ...item };
-    } else {
-      db[this.table].push({ ...item, created_at: new Date().toISOString() });
+    // --- INSERT ---
+    if (this._operation === 'insert') {
+        if (!db[this.table]) db[this.table] = [];
+        const items = Array.isArray(this._payload) ? this._payload : [this._payload];
+        const newItems = items.map((item: any) => ({
+          ...item,
+          id: item.id || Math.random().toString(36).substr(2, 9),
+          created_at: new Date().toISOString()
+        }));
+        db[this.table].push(...newItems);
+        saveLocalDB(db);
+        resolve({ data: newItems, error: null });
+        return;
     }
-    
-    saveLocalDB(db);
-    return { data: item, error: null };
-  }
 
-  then(resolve: any, reject: any) {
-    const db = getLocalDB();
+    // --- UPDATE ---
+    if (this._operation === 'update') {
+        if (!db[this.table]) {
+            resolve({ data: null, error: { message: `Table ${this.table} not found` } });
+            return;
+        }
+        let updatedCount = 0;
+        // Simple update logic based on eq filters
+        db[this.table] = db[this.table].map((row: any) => {
+          let match = true;
+          for (const filter of this.filters) {
+            if (filter.type === 'eq' && row[filter.column] !== filter.value) {
+              match = false;
+              break;
+            }
+          }
+          if (match) {
+            updatedCount++;
+            return { ...row, ...this._payload };
+          }
+          return row;
+        });
+        saveLocalDB(db);
+        resolve({ data: { count: updatedCount }, error: null });
+        return;
+    }
+
+    // --- UPSERT ---
+    if (this._operation === 'upsert') {
+        if (!db[this.table]) db[this.table] = [];
+        const items = Array.isArray(this._payload) ? this._payload : [this._payload];
+        for (const item of items) {
+            const existingIdx = db[this.table].findIndex((r: any) => r.id === item.id);
+            if (existingIdx >= 0) {
+              db[this.table][existingIdx] = { ...db[this.table][existingIdx], ...item };
+            } else {
+              db[this.table].push({ ...item, created_at: item.created_at || new Date().toISOString() });
+            }
+        }
+        saveLocalDB(db);
+        resolve({ data: items, error: null });
+        return;
+    }
+
+    // --- SELECT (Default) ---
     let data = db[this.table] || [];
 
     this.filters.forEach(filter => {
@@ -281,7 +311,6 @@ if (isFirebaseConfigured) {
     firebaseApp = initializeApp(firebaseConfig);
     firebaseAuth = getAuth(firebaseApp);
     firebaseDb = getFirestore(firebaseApp);
-    // Initialize Analytics only if supported in environment (usually browser)
     if (typeof window !== 'undefined') {
        firebaseAnalytics = getAnalytics(firebaseApp);
     }
@@ -363,12 +392,18 @@ class FirestoreQueryBuilder {
   constraints: QueryConstraint[] = [];
   _single = false;
   _docId: string | null = null;
+  
+  _operation: 'select' | 'insert' | 'update' | 'upsert' = 'select';
+  _payload: any = null;
 
   constructor(table: string) {
     this.table = table;
   }
 
-  select() { return this; }
+  select() { 
+    this._operation = 'select';
+    return this; 
+  }
 
   eq(column: string, value: any) {
     if (column === 'id') this._docId = value;
@@ -391,8 +426,88 @@ class FirestoreQueryBuilder {
     return this;
   }
 
+  insert(data: any | any[]) {
+    this._operation = 'insert';
+    this._payload = data;
+    return this;
+  }
+
+  update(data: any) {
+    this._operation = 'update';
+    this._payload = data;
+    return this;
+  }
+
+  upsert(data: any) {
+    this._operation = 'upsert';
+    this._payload = data;
+    return this;
+  }
+
   async then(resolve: any, reject: any) {
     try {
+      // --- INSERT ---
+      if (this._operation === 'insert') {
+        const items = Array.isArray(this._payload) ? this._payload : [this._payload];
+        const results = [];
+        for (const item of items) {
+          const { id, ...rest } = item;
+          let docRef;
+          // If ID is provided, use setDoc (but don't merge unless specifically requested, here logic is insert)
+          // However, in Supabase insert with ID implies creating that ID.
+          if (id) {
+             docRef = doc(firebaseDb, this.table, id);
+             // Ensure we check existence? Supabase insert fails if exists. Firestore setDoc overwrites.
+             // We'll behave like upsert-lite or just overwrite for simplicity in this adapter.
+             await setDoc(docRef, { ...rest, created_at: new Date().toISOString() });
+          } else {
+             docRef = await addDoc(collection(firebaseDb, this.table), { ...rest, created_at: new Date().toISOString() });
+          }
+          results.push({ id: docRef.id, ...rest });
+        }
+        resolve({ data: results, error: null });
+        return;
+      }
+
+      // --- UPDATE ---
+      if (this._operation === 'update') {
+        if (this._docId) {
+           const docRef = doc(firebaseDb, this.table, this._docId);
+           await updateDoc(docRef, this._payload);
+           resolve({ data: this._payload, error: null });
+        } else {
+           // Update based on filters (Query then Update)
+           const q = query(collection(firebaseDb, this.table), ...this.constraints);
+           const snapshot = await getDocs(q);
+           // Warning: Batch updates are better, but loop is fine for small scale
+           const updatePromises = snapshot.docs.map(d => updateDoc(doc(firebaseDb, this.table, d.id), this._payload));
+           await Promise.all(updatePromises);
+           resolve({ data: { count: snapshot.size }, error: null });
+        }
+        return;
+      }
+
+      // --- UPSERT ---
+      if (this._operation === 'upsert') {
+        const items = Array.isArray(this._payload) ? this._payload : [this._payload];
+        const results = [];
+        for (const item of items) {
+          const { id, ...rest } = item;
+          if (id) {
+             const docRef = doc(firebaseDb, this.table, id);
+             await setDoc(docRef, { ...rest }, { merge: true });
+             results.push(item);
+          } else {
+             // Fallback to insert
+             const docRef = await addDoc(collection(firebaseDb, this.table), { ...rest, created_at: new Date().toISOString() });
+             results.push({ id: docRef.id, ...rest });
+          }
+        }
+        resolve({ data: results, error: null });
+        return;
+      }
+
+      // --- SELECT (Default) ---
       if (this._single && this._docId) {
          const docRef = doc(firebaseDb, this.table, this._docId);
          const docSnap = await getDoc(docRef);
@@ -414,48 +529,11 @@ class FirestoreQueryBuilder {
       } else {
         resolve({ data, count: data.length, error: null });
       }
+
     } catch (error: any) {
       console.error("Firebase Adapter Error:", error);
       resolve({ data: null, error: { message: error.message } });
     }
-  }
-
-  async insert(data: any | any[]) {
-    try {
-      const items = Array.isArray(data) ? data : [data];
-      const results = [];
-      for (const item of items) {
-        const { id, ...rest } = item;
-        let docRef;
-        if (id || this._docId) {
-          docRef = doc(firebaseDb, this.table, id || this._docId);
-          await setDoc(docRef, { ...rest, created_at: new Date().toISOString() }, { merge: true });
-        } else {
-          docRef = await addDoc(collection(firebaseDb, this.table), { ...rest, created_at: new Date().toISOString() });
-        }
-        results.push({ id: docRef.id, ...rest });
-      }
-      return { data: results, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  async update(data: any) {
-    try {
-      if (this._docId) {
-         const docRef = doc(firebaseDb, this.table, this._docId);
-         await updateDoc(docRef, data);
-         return { data: { ...data }, error: null };
-      }
-      return { data: null, error: null };
-    } catch (error: any) {
-      return { data: null, error: { message: error.message } };
-    }
-  }
-
-  async upsert(data: any) {
-    return this.insert(data);
   }
 }
 

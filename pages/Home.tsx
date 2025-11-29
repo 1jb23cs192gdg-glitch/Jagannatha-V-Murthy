@@ -7,13 +7,21 @@ import { Link } from 'react-router-dom';
 
 const Home = () => {
   const [updates, setUpdates] = useState<FlashUpdate[]>(MOCK_UPDATES);
-  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=0");
+  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  const [videoId, setVideoId] = useState("dQw4w9WgXcQ");
   const [realStats, setRealStats] = useState({
     waste: 0,
     temples: 0,
     households: 0,
     coins: 0
   });
+
+  const extractVideoId = (url: string) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -39,6 +47,8 @@ const Home = () => {
 
         if (videoConfig && videoConfig.content) {
           setVideoUrl(videoConfig.content);
+          const id = extractVideoId(videoConfig.content);
+          if (id) setVideoId(id);
         }
       }
 
@@ -84,7 +94,7 @@ const Home = () => {
       <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1561587428-f646d5810006?q=80&w=2070" 
+            src="https://www.pspprojects.com/wp-content/uploads/2025/02/01-3-scaled.jpg" 
             alt="Temple Background" 
             className="w-full h-full object-cover scale-105 animate-[pulse_20s_infinite]"
           />
@@ -222,15 +232,32 @@ const Home = () => {
           <h2 className="text-4xl md:text-6xl font-bold mb-12">Clean Premises, Better Future</h2>
           
           <div className="max-w-5xl mx-auto aspect-video bg-black rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(234,88,12,0.3)] border border-stone-800 relative group transform hover:scale-[1.01] transition-transform duration-500">
-             <iframe 
-               className="w-full h-full"
-               src={videoUrl}
-               title="Education Video" 
-               frameBorder="0" 
-               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-               allowFullScreen
-             ></iframe>
-             <div className="absolute top-6 left-6 bg-red-600 text-white text-[10px] font-bold px-4 py-2 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-2">
+             
+             {/* THUMBNAIL + REDIRECT LINK */}
+             <a 
+               href={`https://www.youtube.com/watch?v=${videoId}`} 
+               target="_blank" 
+               rel="noreferrer"
+               className="block w-full h-full relative group cursor-pointer"
+             >
+                <img 
+                  src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`} 
+                  alt="Video Thumbnail" 
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                   <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                      <svg className="w-10 h-10 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                   </div>
+                </div>
+                <div className="absolute bottom-6 left-0 w-full text-center">
+                  <span className="bg-black/70 text-white px-4 py-2 rounded-full text-sm font-bold border border-white/20">
+                    Click to Watch on YouTube
+                  </span>
+                </div>
+             </a>
+
+             <div className="absolute top-6 left-6 bg-red-600 text-white text-[10px] font-bold px-4 py-2 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-2 pointer-events-none">
                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> Featured
              </div>
           </div>

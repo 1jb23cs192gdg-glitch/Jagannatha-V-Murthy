@@ -6,6 +6,12 @@ import { Temple } from '../types';
 const Rankings = () => {
   const [temples, setTemples] = useState<Temple[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Gallery State
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [currentTemplePhotos, setCurrentTemplePhotos] = useState<string[]>([]);
+  const [currentTempleName, setCurrentTempleName] = useState('');
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   useEffect(() => {
     fetchTemples();
@@ -45,8 +51,30 @@ const Rankings = () => {
     }
   };
 
-  const handleViewPhotos = (templeName: string) => {
-    alert(`Opening photo gallery for ${templeName}...\n(This would open a lightbox in the full version)`);
+  const handleViewPhotos = async (templeId: string, templeName: string, mainImage: string) => {
+    setCurrentTempleName(templeName);
+    setGalleryOpen(true);
+    setPhotoLoading(true);
+    
+    // Start with the main profile image
+    const images = [mainImage];
+
+    try {
+      // Fetch approved activity photos from DB
+      const { data } = await supabase
+        .from('temple_photos')
+        .select('image_url')
+        .eq('temple_id', templeId);
+      
+      if (data && data.length > 0) {
+        data.forEach((item: any) => images.push(item.image_url));
+      }
+    } catch (error) {
+      console.error("Error fetching photos", error);
+    }
+
+    setCurrentTemplePhotos(images);
+    setPhotoLoading(false);
   };
 
   if (loading) return <div className="min-h-screen pt-20 text-center">Loading Rankings...</div>;
@@ -84,7 +112,7 @@ const Rankings = () => {
                  <div className="text-3xl font-bold text-green-600">{temple.wasteDonatedKg.toLocaleString()}</div>
                  <div className="text-xs text-stone-400 uppercase font-bold tracking-wider">Kg Waste Recycled</div>
                  <button 
-                   onClick={() => handleViewPhotos(temple.name)}
+                   onClick={() => handleViewPhotos(temple.id, temple.name, temple.imageUrl)}
                    className="mt-4 text-orange-600 text-sm font-semibold hover:bg-orange-50 px-3 py-1 rounded transition-colors"
                  >
                    View Photos
@@ -94,6 +122,61 @@ const Rankings = () => {
           ))}
         </div>
       </div>
+
+      {/* Gallery Modal */}
+      {galleryOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+          onClick={() => setGalleryOpen(false)}
+        >
+           <div 
+             className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
+             onClick={e => e.stopPropagation()}
+           >
+              <div className="flex justify-between items-center mb-6 border-b border-stone-100 pb-4">
+                 <div>
+                   <h2 className="text-2xl font-bold text-stone-800">{currentTempleName}</h2>
+                   <p className="text-sm text-stone-500">Activity Gallery</p>
+                 </div>
+                 <button onClick={() => setGalleryOpen(false)} className="bg-stone-100 p-2 rounded-full hover:bg-stone-200 text-stone-600 transition-colors">
+                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2">
+                 {photoLoading ? (
+                   <div className="flex items-center justify-center h-48">
+                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+                   </div>
+                 ) : (
+                   <>
+                     {currentTemplePhotos.length === 0 ? (
+                       <div className="text-center py-10 text-stone-400">No photos available for this temple yet.</div>
+                     ) : (
+                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                          {currentTemplePhotos.map((img, idx) => (
+                            <div key={idx} className="relative group overflow-hidden rounded-xl bg-stone-100 h-64">
+                              <img 
+                                src={img} 
+                                alt={`Gallery ${idx}`} 
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                              />
+                              {idx === 0 && (
+                                <span className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded">Profile Pic</span>
+                              )}
+                            </div>
+                          ))}
+                       </div>
+                     )}
+                   </>
+                 )}
+              </div>
+              <div className="mt-4 pt-4 border-t border-stone-100 text-center text-xs text-stone-400">
+                Displaying verified proofs and temple activities.
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

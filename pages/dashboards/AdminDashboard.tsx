@@ -46,7 +46,14 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       // 1. Fetch Temples
       const { data: templeData } = await supabase.from('temples').select('*');
       if (templeData) {
-        setTemples(templeData.map(t => ({...t, wasteDonatedKg: t.waste_donated_kg, imageUrl: t.image_url})));
+        // Fix: Map ngo_id from DB to ngoId in local state to ensure UI updates correctly
+        setTemples(templeData.map(t => ({
+          ...t, 
+          wasteDonatedKg: t.waste_donated_kg, 
+          imageUrl: t.image_url,
+          ngoId: t.ngo_id 
+        })));
+        
         const totalWaste = templeData.reduce((acc, curr) => acc + (curr.waste_donated_kg || 0), 0);
         setStats(prev => ({ ...prev, waste: totalWaste }));
       }
@@ -70,6 +77,14 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
   };
 
+  // Extract ID for thumbnail
+  const extractVideoId = (url: string) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
   const handlePostUpdate = async () => {
     if (!updateTitle.trim()) {
       alert("Please enter a title for the update.");
@@ -89,13 +104,25 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
   const handleUpdateVideo = async () => {
     if (!videoUrl.trim()) return;
+    
+    // Validate it looks like a youtube link
+    const id = extractVideoId(videoUrl);
+    if (!id) {
+       alert("Invalid YouTube URL");
+       return;
+    }
+
+    // Save the ID-based watch URL for consistency
+    const cleanUrl = `https://www.youtube.com/watch?v=${id}`;
+
     const { error } = await supabase.from('flash_updates').insert([{
       title: 'Homepage Video',
-      content: videoUrl,
+      content: cleanUrl,
       type: 'VIDEO_CONFIG'
     }]);
     if (error) alert("Failed to update video.");
     else {
+      setVideoUrl(cleanUrl); 
       alert("Homepage Video Updated!");
     }
   };
@@ -134,7 +161,11 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     
     if (!error) {
       alert("NGO Assigned successfully.");
-      fetchAdminData();
+      // Refresh data to show new assignment
+      await fetchAdminData();
+    } else {
+      console.error("Assignment error", error);
+      alert("Failed to assign NGO");
     }
   };
 
@@ -146,6 +177,32 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     if (!error) {
       setServiceRequests(prev => prev.filter(r => r.id !== id));
       alert("Request marked as Resolved.");
+    }
+  };
+
+  const handleApproveProof = async (req: any) => {
+    // 1. Add to temple_photos table so it shows up in rankings
+    const { error: photoError } = await supabase.from('temple_photos').insert([{
+      temple_id: req.temple_id,
+      image_url: req.image_url,
+      caption: 'Verified Activity Proof'
+    }]);
+
+    if (photoError) {
+      console.error("Error publishing photo", photoError);
+      alert("Failed to publish photo to gallery.");
+      return;
+    }
+
+    // 2. Mark request as APPROVED
+    const { error: updateError } = await supabase
+      .from('service_requests')
+      .update({ status: 'APPROVED' })
+      .eq('id', req.id);
+
+    if (!updateError) {
+      setServiceRequests(prev => prev.filter(r => r.id !== req.id));
+      alert("Photo Approved & Published to Rankings Gallery!");
     }
   };
 
@@ -291,7 +348,7 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                            <select 
                              onChange={(e) => handleAssignNgo(t.id, e.target.value)}
                              className="border rounded-lg p-2 text-sm bg-white"
-                             defaultValue=""
+                             value={assignedNgo ? assignedNgo.id : ""}
                            >
                              <option value="" disabled>Select NGO</option>
                              {ngos.map(n => (
@@ -313,7 +370,7 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
              <div className="p-6 border-b border-stone-100 flex justify-between items-center">
                <div>
                  <h2 className="font-bold text-xl text-stone-800">Temple Service Requests</h2>
-                 <p className="text-sm text-stone-500">Manage support tickets from temple partners.</p>
+                 <p className="text-sm text-stone-500">Manage support tickets and approve activity proofs.</p>
                </div>
                <span className="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full">{serviceRequests.length} Pending</span>
              </div>
@@ -325,23 +382,50 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                   </div>
                 ) : (
                   serviceRequests.map(req => (
-                    <div key={req.id} className="p-6 flex flex-col sm:flex-row justify-between items-center gap-4 hover:bg-stone-50 transition-colors">
-                       <div>
+                    <div key={req.id} className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-stone-50 transition-colors">
+                       <div className="flex-1">
                          <div className="flex items-center gap-2 mb-1">
                            <h3 className="font-bold text-stone-800 text-lg">{req.temples?.name}</h3>
                            <span className="text-xs text-stone-500">({req.temples?.location})</span>
                          </div>
-                         <div className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold mb-1">
+                         <div className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold mb-2">
                            {req.request_type}
                          </div>
-                         <p className="text-xs text-stone-400 mt-1">Requested: {new Date(req.created_at).toLocaleString()}</p>
+                         <p className="text-xs text-stone-400 mb-2">Requested: {new Date(req.created_at).toLocaleString()}</p>
+                         
+                         {req.request_type === 'ACTIVITY_PROOF' && req.image_url && (
+                           <div className="mt-2">
+                              <p className="text-xs font-bold text-stone-600 mb-1">Proof Attachment:</p>
+                              <img src={req.image_url} alt="Proof" className="h-32 rounded-lg border border-stone-200 shadow-sm" />
+                           </div>
+                         )}
                        </div>
-                       <button 
-                         onClick={() => resolveRequest(req.id)}
-                         className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm"
-                       >
-                         Mark Resolved
-                       </button>
+                       
+                       <div className="flex gap-2">
+                         {req.request_type === 'ACTIVITY_PROOF' && req.image_url ? (
+                            <>
+                              <button 
+                                onClick={() => handleApproveProof(req)}
+                                className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm"
+                              >
+                                Approve & Publish
+                              </button>
+                              <button 
+                                onClick={() => resolveRequest(req.id)}
+                                className="bg-stone-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-stone-600 shadow-sm"
+                              >
+                                Dismiss
+                              </button>
+                            </>
+                         ) : (
+                           <button 
+                             onClick={() => resolveRequest(req.id)}
+                             className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm"
+                           >
+                             Mark Resolved
+                           </button>
+                         )}
+                       </div>
                     </div>
                   ))
                 )}
@@ -354,29 +438,39 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               <h2 className="font-bold text-xl mb-4 text-stone-800">Homepage Configuration</h2>
               <div className="space-y-6">
                  <div>
-                   <label className="block text-sm font-bold text-stone-700 mb-2">Featured YouTube Video URL (Embed Link)</label>
+                   <label className="block text-sm font-bold text-stone-700 mb-2">Featured YouTube Video URL</label>
                    <div className="flex gap-2">
                      <input 
                        type="text" 
                        value={videoUrl}
                        onChange={(e) => setVideoUrl(e.target.value)}
-                       placeholder="https://www.youtube.com/embed/..." 
+                       placeholder="Paste YouTube Link here (e.g. https://youtu.be/...)" 
                        className="flex-1 rounded-xl border-stone-300 border p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none" 
                      />
                      <button onClick={handleUpdateVideo} className="bg-stone-800 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors">Update</button>
                    </div>
-                   <p className="text-xs text-stone-400 mt-2">Example: https://www.youtube.com/embed/VIDEO_ID</p>
+                   <p className="text-xs text-stone-400 mt-2">Works with standard YouTube links and Short URLs.</p>
                  </div>
                  
-                 {videoUrl && (
-                   <div className="aspect-video bg-black rounded-xl overflow-hidden max-w-lg shadow-lg">
-                      <iframe 
-                         src={videoUrl} 
-                         className="w-full h-full" 
-                         title="Preview"
-                         frameBorder="0"
-                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      ></iframe>
+                 {videoUrl && extractVideoId(videoUrl) && (
+                   <div className="aspect-video bg-black rounded-xl overflow-hidden max-w-lg shadow-lg relative group">
+                      <a 
+                         href={`https://www.youtube.com/watch?v=${extractVideoId(videoUrl)}`} 
+                         target="_blank" 
+                         rel="noreferrer"
+                         className="block w-full h-full"
+                      >
+                         <img 
+                           src={`https://img.youtube.com/vi/${extractVideoId(videoUrl)}/hqdefault.jpg`} 
+                           alt="Preview" 
+                           className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                         />
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-xl">
+                               <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                         </div>
+                      </a>
                    </div>
                  )}
               </div>

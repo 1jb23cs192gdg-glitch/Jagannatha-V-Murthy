@@ -11,7 +11,9 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [loading, setLoading] = useState(true);
   const [eventType, setEventType] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [proofFile, setProofFile] = useState<string | null>(null);
   const [adminUpdates, setAdminUpdates] = useState<FlashUpdate[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editDesc, setEditDesc] = useState('');
   const [editImage, setEditImage] = useState('');
@@ -23,6 +25,12 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     fetchUpdates();
   }, []);
 
+  useEffect(() => {
+    if (temple) {
+      fetchRequests();
+    }
+  }, [temple]);
+
   const fetchUpdates = async () => {
     const { data } = await supabase.from('flash_updates').select('*').limit(5).order('created_at', { ascending: false });
     if (data) {
@@ -33,6 +41,23 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         date: new Date(d.created_at).toLocaleDateString(),
         type: d.type as any
       })));
+    }
+  };
+
+  const fetchRequests = async () => {
+    if (!temple) return;
+    // Removed .order() from query to avoid Firestore "Missing Index" error.
+    // Sorting is now done client-side.
+    const { data } = await supabase
+      .from('service_requests')
+      .select('*')
+      .eq('temple_id', temple.id);
+    
+    if (data) {
+      const sortedData = data.sort((a: any, b: any) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setRequests(sortedData);
     }
   };
 
@@ -54,7 +79,6 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           location: data.location || 'Location Not Set',
           wasteDonatedKg: data.waste_donated_kg,
           greenStars: data.green_stars,
-          // Updated fallback image to a spiritual icon instead of generic placeholder
           imageUrl: data.image_url || 'https://images.unsplash.com/photo-1606293926075-69a00dbfde81?q=80&w=200&auto=format&fit=crop',
           description: data.description || '',
           ngoId: data.ngo_id
@@ -62,7 +86,6 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setEditDesc(data.description || '');
         setEditImage(data.image_url || '');
 
-        // Fetch NGO details if assigned
         if (data.ngo_id) {
           const { data: ngoData } = await supabase.from('profiles').select('*').eq('id', data.ngo_id).single();
           setAssignedNgo(ngoData);
@@ -89,14 +112,43 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
   };
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setIsUploading(true);
-      // Mock upload delay
-      setTimeout(() => {
-        setIsUploading(false);
-        alert("Activity Proof uploaded successfully! Admin will verify and update your rankings.");
-      }, 1000);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofFile(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmitProof = async () => {
+    if (!proofFile || !temple) {
+      alert("Please select a file first.");
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      const { error } = await supabase.from('service_requests').insert([{
+        temple_id: temple.id,
+        request_type: 'ACTIVITY_PROOF',
+        status: 'PENDING',
+        image_url: proofFile 
+      }]);
+
+      if (error) throw error;
+
+      alert("Activity Proof uploaded successfully! Admin will verify and update your rankings.");
+      setProofFile(null);
+      fetchRequests();
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Failed to submit proof. Please try again.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -119,6 +171,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     } else {
       alert(`Volunteer request for '${eventType}' has been sent to Admin for approval.`);
       setEventType('');
+      fetchRequests();
     }
   };
 
@@ -229,26 +282,43 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
              <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
                <h2 className="font-bold text-xl mb-4 text-stone-800">Upload Activity Proof</h2>
                <p className="text-sm text-stone-500 mb-4">Upload photos of waste segregation or bin usage to improve ranking.</p>
-               <div className="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center bg-stone-50 hover:bg-stone-100 transition-colors relative">
-                 {isUploading ? (
-                   <div className="text-orange-600 font-bold animate-pulse">Uploading...</div>
+               
+               <div 
+                 onClick={() => fileInputRef.current?.click()}
+                 className="cursor-pointer border-2 border-dashed border-stone-300 rounded-lg p-8 text-center bg-stone-50 hover:bg-stone-100 transition-colors relative"
+               >
+                 {proofFile ? (
+                   <div className="relative">
+                     <img src={proofFile} alt="Preview" className="max-h-64 mx-auto rounded-lg shadow-md" />
+                     <button 
+                        onClick={(e) => { e.stopPropagation(); setProofFile(null); }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                     >
+                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                     </button>
+                     <p className="mt-2 text-green-600 font-bold text-sm">Image Selected</p>
+                   </div>
                  ) : (
                    <>
                      <svg className="w-10 h-10 text-stone-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                     <input 
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleUpload}
-                      className="block w-full text-sm text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
-                     />
+                     <p className="text-stone-500 text-sm">Click to select photo</p>
                    </>
                  )}
+                 <input 
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept="image/*"
+                  className="hidden"
+                 />
                </div>
+
                <button 
-                  onClick={() => fileInputRef.current?.click()} 
-                  className="w-full mt-4 bg-orange-600 text-white py-2 rounded-lg font-semibold hover:bg-orange-700"
+                  onClick={handleSubmitProof} 
+                  disabled={isUploading || !proofFile}
+                  className="w-full mt-4 bg-orange-600 text-white py-3 rounded-lg font-bold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                >
-                  Submit for Verification
+                  {isUploading ? 'Uploading...' : 'Submit for Verification'}
                </button>
              </div>
 
@@ -271,6 +341,44 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                    >
                      Request
                    </button>
+                </div>
+             </div>
+
+             {/* HISTORY SECTION */}
+             <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                <h2 className="font-bold text-xl mb-4 text-stone-800">Submission History & Status</h2>
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                    {requests.length === 0 ? (
+                        <p className="text-stone-500 italic text-sm text-center py-4">No activity proofs or requests submitted yet.</p>
+                    ) : (
+                        requests.map(req => (
+                            <div key={req.id} className="flex flex-col sm:flex-row gap-4 p-4 border border-stone-100 rounded-lg bg-stone-50 items-start">
+                                {req.image_url && (
+                                    <div className="relative group">
+                                      <img src={req.image_url} alt="Proof" className="w-24 h-24 object-cover rounded-md border border-stone-200" />
+                                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold rounded-md cursor-pointer">View</div>
+                                    </div>
+                                )}
+                                <div className="flex-1 w-full">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className="font-bold text-stone-800 text-sm">{req.request_type ? req.request_type.replace('_', ' ') : 'Request'}</h4>
+                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                                            req.status === 'RESOLVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                            {req.status}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-stone-500 mb-2">Submitted: {new Date(req.created_at).toLocaleDateString()} {new Date(req.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                    
+                                    {req.status === 'RESOLVED' && (
+                                      <div className="bg-green-50 border border-green-100 p-2 rounded text-xs text-green-800 flex items-center gap-1">
+                                        <span>✓</span> Verified & Processed by Admin
+                                      </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
              </div>
            </div>

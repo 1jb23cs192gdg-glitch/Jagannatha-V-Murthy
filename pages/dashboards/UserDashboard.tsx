@@ -14,7 +14,14 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [volunteerStatus, setVolunteerStatus] = useState<string>('NONE');
   const [history, setHistory] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'HISTORY'>('DASHBOARD');
-  const [videoUrl, setVideoUrl] = useState('');
+  const [videoId, setVideoId] = useState('dQw4w9WgXcQ');
+
+  const extractVideoId = (url: string) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
 
   useEffect(() => {
     fetchProfile();
@@ -24,10 +31,9 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
   const fetchVideo = async () => {
     const { data } = await supabase.from('flash_updates').select('*').eq('type', 'VIDEO_CONFIG').single();
-    if (data) {
-      setVideoUrl(data.content);
-    } else {
-      setVideoUrl("https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=0"); // Fallback
+    if (data && data.content) {
+      const id = extractVideoId(data.content);
+      if (id) setVideoId(id);
     }
   };
 
@@ -45,12 +51,16 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const fetchHistory = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      // Removed .order() to avoid Firestore index requirement.
       const { data } = await supabase
         .from('waste_logs')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      setHistory(data || []);
+        .eq('user_id', user.id);
+      
+      const sortedData = (data || []).sort((a: any, b: any) => 
+         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setHistory(sortedData);
     }
   };
 
@@ -258,14 +268,24 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                     </h3>
                   </div>
                   <div className="aspect-video bg-black relative">
-                     <iframe 
-                       src={videoUrl} 
-                       className="w-full h-full absolute inset-0" 
-                       title="Education"
-                       frameBorder="0"
-                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                       allowFullScreen
-                     ></iframe>
+                     {/* THUMBNAIL + REDIRECT LINK */}
+                     <a 
+                       href={`https://www.youtube.com/watch?v=${videoId}`} 
+                       target="_blank" 
+                       rel="noreferrer"
+                       className="block w-full h-full relative group cursor-pointer"
+                     >
+                        <img 
+                          src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`} 
+                          alt="Video Thumbnail" 
+                          className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                           <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                              <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                           </div>
+                        </div>
+                     </a>
                   </div>
                   <div className="p-4 text-xs text-stone-400">
                     Learn how to keep temple premises clean and segregate waste properly.

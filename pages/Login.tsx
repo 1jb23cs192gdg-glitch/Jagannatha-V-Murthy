@@ -100,7 +100,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     } catch (error: any) {
       console.error("Auth Error:", error);
-      setErrorMsg(error.message || "Authentication failed");
+      setErrorMsg(typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error));
     } finally {
       setLoading(false);
     }
@@ -121,7 +121,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex overflow-hidden min-h-[600px]">
         {/* Left Side - Visuals */}
         <div className="hidden lg:flex w-1/2 bg-stone-900 relative items-center justify-center overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1542397284385-6010376c5337?q=80&w=1000&auto=format&fit=crop" alt="Temple" className="absolute inset-0 w-full h-full object-cover opacity-60" />
+          <img src="https://www.pspprojects.com/wp-content/uploads/2025/02/01-3-scaled.jpg" alt="Temple" className="absolute inset-0 w-full h-full object-cover opacity-60" />
           <div className="relative z-10 text-center text-white p-12">
             <div className="w-32 h-32 bg-orange-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl border-4 border-white/20">
               <BowArrowLogo className="w-20 h-20" color="white" />
@@ -199,7 +199,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
 
             {errorMsg && (
-              <div className="p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 font-semibold">
+              <div className="p-3 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 font-semibold break-words">
                 ⚠️ {errorMsg}
               </div>
             )}
