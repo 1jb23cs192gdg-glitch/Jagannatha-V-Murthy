@@ -59,15 +59,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             volunteer_status: 'NONE'
           });
 
-          // Create Temple if needed
+          // Create Temple entry ONLY if registering as Temple
           if (activeTab === UserRole.TEMPLE) {
-             await supabase.from('temples').insert([{
+             const { error: templeError } = await supabase.from('temples').insert([{
                owner_id: user.id,
-               name: fullName,
-               location: 'Local Temple',
+               name: fullName || 'My New Temple',
+               location: 'Location Pending',
                waste_donated_kg: 0,
-               green_stars: 0
+               green_stars: 1,
+               description: 'New temple joining the network.'
              }]);
+             if (templeError) console.error("Error creating temple:", templeError);
           }
         }
       } else {
@@ -79,19 +81,22 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
 
       if (user) {
+        // Persist Mock Session
         localStorage.setItem('temple_mock_session', JSON.stringify(user));
         
+        // Fetch Profile to get authoritative Role
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        const role = profile?.role || activeTab;
+        // If registering, trust activeTab. If logging in, trust profile role.
+        const role = isRegistering ? activeTab : (profile?.role || activeTab);
+
+        // Notify parent App component
+        onLogin({...user, role: role});
 
         // Redirect based on role
-        switch (role) {
-          case UserRole.ADMIN: navigate('/admin-dashboard'); break;
-          case UserRole.TEMPLE: navigate('/temple-dashboard'); break;
-          case UserRole.NGO: navigate('/ngo-dashboard'); break;
-          case UserRole.PERSON: navigate('/user-dashboard'); break;
-          default: navigate('/');
-        }
+        if (role === UserRole.ADMIN) navigate('/admin-dashboard');
+        else if (role === UserRole.TEMPLE) navigate('/temple-dashboard');
+        else if (role === UserRole.NGO) navigate('/ngo-dashboard');
+        else navigate('/user-dashboard');
       }
 
     } catch (error: any) {
@@ -102,157 +107,137 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
+  // Helper to get placeholder based on role
   const getEmailPlaceholder = () => {
     switch(activeTab) {
       case UserRole.ADMIN: return "admin@demo.com";
-      case UserRole.TEMPLE: return "temple@demo.com";
+      case UserRole.TEMPLE: return "kashi@temple.com";
       case UserRole.NGO: return "ngo@demo.com";
       default: return "user@demo.com";
     }
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
-      {/* Background Image with Overlay */}
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden font-sans">
+      {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <img 
-          src="https://wallpaperaccess.com/full/504997.jpg" 
+          src="https://www.mypuritour.com/wp-content/uploads/2022/10/mypuritourservice-1536x1020.jpg" 
           alt="Temple Background" 
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover scale-105 animate-[pulse_60s_infinite]"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-stone-900/60 to-black/80 backdrop-blur-[2px]"></div>
+        {/* Dark futuristic overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-stone-900/80 to-stone-900/50 backdrop-blur-[2px]"></div>
       </div>
 
-      <div className="relative z-10 w-full max-w-6xl flex flex-col md:flex-row shadow-2xl rounded-3xl overflow-hidden min-h-[650px] animate-fade-in-up">
+      {/* Futuristic Glass Card */}
+      <div className="relative z-10 w-full max-w-md bg-stone-900/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl ring-1 ring-white/20 animate-fade-in-up">
         
-        {/* Left Side: Brand & Visuals */}
-        <div className="w-full md:w-1/2 p-10 flex flex-col justify-between bg-black/30 backdrop-blur-md border-r border-white/10 text-white relative">
-           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 via-red-500 to-yellow-500"></div>
-           
-           <div>
-             <div className="flex items-center gap-3 mb-8">
-                <div className="bg-orange-600/90 p-2 rounded-lg shadow-lg shadow-orange-500/30">
-                  <BowArrowLogo className="w-8 h-8" color="white" />
-                </div>
-                <h1 className="text-2xl font-bold tracking-wide">Temple<span className="text-orange-400">2</span>Ayurveda</h1>
+        {/* Logo & Header */}
+        <div className="text-center mb-8">
+           <div className="inline-flex p-3 rounded-full bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/30 mb-4 ring-2 ring-white/20">
+              <BowArrowLogo className="w-10 h-10 text-white" />
+           </div>
+           <h2 className="text-3xl font-bold text-white tracking-tight drop-shadow-lg">
+             {isRegistering ? 'Initialize Identity' : 'Access Portal'}
+           </h2>
+           <p className="text-stone-300 text-sm mt-2 font-light tracking-wide">
+             Temple to Ayurveda Ecosystem v2.0
+           </p>
+        </div>
+
+        {/* Role Segmented Control */}
+        <div className="bg-black/40 p-1 rounded-xl mb-6 flex justify-between border border-white/5 shadow-inner">
+          {[UserRole.PERSON, UserRole.TEMPLE, UserRole.NGO, UserRole.ADMIN].map((role) => (
+             <button
+               key={role}
+               onClick={() => { setActiveTab(role); setErrorMsg(null); }}
+               className={`flex-1 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+                 activeTab === role 
+                   ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg' 
+                   : 'text-stone-400 hover:text-stone-200 hover:bg-white/5'
+               }`}
+             >
+               {role}
+             </button>
+          ))}
+        </div>
+
+        {/* Form Inputs */}
+        <div className="space-y-5">
+           {isRegistering && (
+             <div className="group">
+               <label className="block text-xs font-bold text-orange-400 uppercase tracking-wide mb-1 ml-1 group-focus-within:text-orange-300 transition-colors">
+                 {activeTab === UserRole.TEMPLE ? 'Temple Name' : 'Full Name'}
+               </label>
+               <input 
+                 type="text" 
+                 value={formData.fullName}
+                 onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                 className="block w-full rounded-xl border border-stone-600 bg-stone-800/50 p-3 text-white placeholder-stone-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all shadow-inner"
+                 placeholder="Enter Identity"
+               />
              </div>
-             
-             <h2 className="text-5xl font-bold leading-tight mb-6">
-               Transforming <br/>
-               <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-yellow-300">Devotion</span> into <br/>
-               Sustainability
-             </h2>
-             <p className="text-stone-300 text-lg max-w-md">
-               Join the ecosystem where AI, IoT, and ancient wisdom converge to turn sacred offerings into renewable resources.
-             </p>
+           )}
+           
+           <div className="group">
+             <label className="block text-xs font-bold text-orange-400 uppercase tracking-wide mb-1 ml-1 group-focus-within:text-orange-300 transition-colors">
+               Email Address
+             </label>
+             <input 
+               type="email" 
+               value={formData.email}
+               onChange={(e) => setFormData({...formData, email: e.target.value})}
+               className="block w-full rounded-xl border border-stone-600 bg-stone-800/50 p-3 text-white placeholder-stone-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all shadow-inner"
+               placeholder={getEmailPlaceholder()}
+             />
            </div>
 
-           <div className="space-y-4 mt-12 md:mt-0">
-             <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
-               <div className="text-2xl">🌿</div>
-               <div>
-                 <p className="font-bold text-sm">Eco-Friendly Login</p>
-                 <p className="text-xs text-stone-400">Secure access for Temples, NGOs & People</p>
-               </div>
-             </div>
-           </div>
-           
-           <div className="text-xs text-stone-500 mt-8">
-             &copy; 2025 SIH Innovation. Secure Environment.
+           <div className="group">
+             <label className="block text-xs font-bold text-orange-400 uppercase tracking-wide mb-1 ml-1 group-focus-within:text-orange-300 transition-colors">
+               Passcode
+             </label>
+             <input 
+               type="password" 
+               value={formData.password}
+               onChange={(e) => setFormData({...formData, password: e.target.value})}
+               className="block w-full rounded-xl border border-stone-600 bg-stone-800/50 p-3 text-white placeholder-stone-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all shadow-inner"
+               placeholder="••••••••"
+             />
            </div>
         </div>
 
-        {/* Right Side: Login Form */}
-        <div className="w-full md:w-1/2 bg-stone-900/80 backdrop-blur-xl p-10 flex flex-col justify-center relative">
-          
-          <div className="text-center mb-8">
-            <h3 className="text-3xl font-bold text-white mb-2">{isRegistering ? 'Create Account' : 'Welcome Back'}</h3>
-            <p className="text-stone-400 text-sm">Choose your role to continue</p>
+        {errorMsg && (
+          <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 text-red-200 text-xs rounded-lg font-semibold flex items-center gap-2 animate-shake">
+            <span>⚠️</span> {errorMsg}
           </div>
+        )}
 
-          {/* Role Tabs */}
-          <div className="grid grid-cols-4 gap-2 mb-8 bg-black/40 p-1 rounded-xl">
-            {[UserRole.PERSON, UserRole.TEMPLE, UserRole.NGO, UserRole.ADMIN].map((role) => (
-              <button
-                key={role}
-                onClick={() => { setActiveTab(role); setErrorMsg(null); }}
-                className={`py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider transition-all ${
-                  activeTab === role 
-                    ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg' 
-                    : 'text-stone-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {role}
-              </button>
-            ))}
-          </div>
+        <button 
+          onClick={handleAuth}
+          disabled={loading}
+          className="w-full mt-8 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 bg-[length:200%_auto] hover:bg-[position:right_center] transition-all duration-500 shadow-lg shadow-orange-900/20 border border-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5 active:scale-95"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Processing...
+            </span>
+          ) : (
+            isRegistering ? 'Establish Connection' : 'Enter System'
+          )}
+        </button>
 
-          <div className="space-y-5">
-            {isRegistering && (
-              <div className="group">
-                <label className="block text-xs font-bold text-stone-500 uppercase mb-1 ml-1 group-focus-within:text-orange-500 transition-colors">
-                  {activeTab === UserRole.TEMPLE ? 'Temple Name' : 'Full Name'}
-                </label>
-                <input 
-                  type="text" 
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                  className="block w-full rounded-xl bg-black/40 border border-stone-700 text-white p-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all placeholder-stone-600" 
-                  placeholder="Enter Name" 
-                />
-              </div>
-            )}
-            
-            <div className="group">
-              <label className="block text-xs font-bold text-stone-500 uppercase mb-1 ml-1 group-focus-within:text-orange-500 transition-colors">Email Address</label>
-              <input 
-                type="email" 
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="block w-full rounded-xl bg-black/40 border border-stone-700 text-white p-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all placeholder-stone-600" 
-                placeholder={getEmailPlaceholder()} 
-              />
-            </div>
-
-            <div className="group">
-              <label className="block text-xs font-bold text-stone-500 uppercase mb-1 ml-1 group-focus-within:text-orange-500 transition-colors">Password</label>
-              <input 
-                type="password" 
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                className="block w-full rounded-xl bg-black/40 border border-stone-700 text-white p-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all placeholder-stone-600" 
-                placeholder="••••••••" 
-              />
-            </div>
-
-            {errorMsg && (
-              <div className="p-3 bg-red-500/10 border border-red-500/50 text-red-400 text-xs rounded-lg font-medium text-center">
-                {errorMsg}
-              </div>
-            )}
-
-            <button 
-              onClick={handleAuth}
-              disabled={loading}
-              className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 shadow-xl shadow-orange-900/20 transform hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  Processing...
-                </span>
-              ) : (
-                isRegistering ? 'Create Account' : 'Access Portal'
-              )}
-            </button>
-
-            <div className="text-center pt-4">
-               <button onClick={() => { setIsRegistering(!isRegistering); setErrorMsg(null); }} className="text-sm text-stone-400 hover:text-white transition-colors">
-                 {isRegistering ? 'Already have an account?' : 'New here?'}{' '}
-                 <span className="text-orange-500 font-bold underline decoration-2 underline-offset-4">{isRegistering ? 'Login' : 'Create Account'}</span>
-               </button>
-            </div>
-          </div>
+        <div className="text-center mt-6">
+           <button 
+             onClick={() => { setIsRegistering(!isRegistering); setErrorMsg(null); }} 
+             className="text-sm text-stone-400 hover:text-orange-400 font-medium transition-colors"
+           >
+             {isRegistering ? 'Already have an ID? Login' : 'New user? Create Identity'}
+           </button>
         </div>
       </div>
     </div>

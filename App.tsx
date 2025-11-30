@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -22,6 +23,22 @@ import UserDashboard from './pages/dashboards/UserDashboard';
 import { User, UserRole } from './types';
 import { supabase } from './lib/supabaseClient';
 import { BowArrowLogo } from './constants';
+
+// Protected Route Wrapper
+interface ProtectedRouteProps {
+  children?: React.ReactNode;
+  allowedRoles: UserRole[];
+  user: User | null;
+  loading: boolean;
+}
+
+const ProtectedRoute = ({ children, allowedRoles, user, loading }: ProtectedRouteProps) => {
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (!user) return <Navigate to="/login" />;
+  if (!allowedRoles.includes(user.role)) return <Navigate to="/" />;
+  
+  return <>{children}</>;
+};
 
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -83,7 +100,8 @@ const App = () => {
              full_name: 'Recovered User',
              role: UserRole.PERSON,
              green_coins: 0,
-             waste_donated_kg: 0
+             waste_donated_kg: 0,
+             is_disabled: false
            });
            
            if (!createError) {
@@ -101,7 +119,8 @@ const App = () => {
                   role: retryData.role as UserRole,
                   greenCoins: retryData.green_coins,
                   greenStars: retryData.green_stars,
-                  isVolunteer: retryData.is_volunteer
+                  isVolunteer: retryData.is_volunteer,
+                  isDisabled: retryData.is_disabled
                 });
                 return; 
              }
@@ -111,13 +130,21 @@ const App = () => {
       }
       
       if (data) {
+        // Security Check: Disabled account
+        if (data.is_disabled) {
+          await handleLogout();
+          alert("Your session has been terminated because your account is disabled. Please contact admin.");
+          return;
+        }
+
         setUser({
           id: data.id,
           name: data.full_name || 'User',
           role: data.role as UserRole,
           greenCoins: data.green_coins,
           greenStars: data.green_stars,
-          isVolunteer: data.is_volunteer
+          isVolunteer: data.is_volunteer,
+          isDisabled: data.is_disabled
         });
       }
     } catch (error: any) {
@@ -140,15 +167,6 @@ const App = () => {
     localStorage.removeItem('temple_mock_session'); // Clear mock session
     await supabase.auth.signOut();
     setUser(null);
-  };
-
-  // Protected Route Wrapper
-  const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles: UserRole[] }) => {
-    if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-    if (!user) return <Navigate to="/login" />;
-    if (!allowedRoles.includes(user.role)) return <Navigate to="/" />;
-    
-    return <>{children}</>;
   };
 
   if (loading) return (
@@ -182,22 +200,22 @@ const App = () => {
             
             {/* Protected Dashboards */}
             <Route path="/admin-dashboard" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+              <ProtectedRoute user={user} loading={loading} allowedRoles={[UserRole.ADMIN]}>
                 <AdminDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } />
             <Route path="/temple-dashboard" element={
-              <ProtectedRoute allowedRoles={[UserRole.TEMPLE]}>
+              <ProtectedRoute user={user} loading={loading} allowedRoles={[UserRole.TEMPLE]}>
                 <TempleDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } />
             <Route path="/ngo-dashboard" element={
-              <ProtectedRoute allowedRoles={[UserRole.NGO]}>
+              <ProtectedRoute user={user} loading={loading} allowedRoles={[UserRole.NGO]}>
                 <NgoDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } />
             <Route path="/user-dashboard" element={
-              <ProtectedRoute allowedRoles={[UserRole.PERSON]}>
+              <ProtectedRoute user={user} loading={loading} allowedRoles={[UserRole.PERSON]}>
                 <UserDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } />

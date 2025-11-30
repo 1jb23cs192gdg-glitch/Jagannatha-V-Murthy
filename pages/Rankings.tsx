@@ -1,5 +1,5 @@
+
 import React, { useEffect, useState } from 'react';
-import { MOCK_TEMPLES } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 import { Temple } from '../types';
 
@@ -26,7 +26,7 @@ const Rankings = () => {
       
       if (error) throw error;
 
-      if (data && data.length > 0) {
+      if (data) {
         const formattedTemples: Temple[] = data.map(t => ({
           id: t.id,
           name: t.name,
@@ -35,17 +35,17 @@ const Rankings = () => {
           greenStars: t.green_stars,
           imageUrl: t.image_url || 'https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&q=80&w=400',
           description: t.description,
-          ngoId: t.ngo_id
+          ngoId: t.ngo_id,
+          spocDetails: t.spocDetails, // Include SPOC details
+          address: t.address
         }));
         setTemples(formattedTemples);
       } else {
-        // Fallback to mock if DB is empty for demo purposes
-        setTemples([...MOCK_TEMPLES].sort((a, b) => b.wasteDonatedKg - a.wasteDonatedKg));
+        setTemples([]);
       }
     } catch (error) {
       console.error("Error fetching temples:", error);
-      // Fallback on error
-      setTemples([...MOCK_TEMPLES].sort((a, b) => b.wasteDonatedKg - a.wasteDonatedKg));
+      setTemples([]);
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,8 @@ const Rankings = () => {
       const { data } = await supabase
         .from('temple_photos')
         .select('image_url')
-        .eq('temple_id', templeId);
+        .eq('temple_id', templeId)
+        .eq('status', 'APPROVED');
       
       if (data && data.length > 0) {
         data.forEach((item: any) => images.push(item.image_url));
@@ -89,7 +90,7 @@ const Rankings = () => {
 
         <div className="space-y-6">
           {temples.map((temple, index) => (
-            <div key={temple.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 flex flex-col md:flex-row items-center gap-6 transform hover:scale-[1.01] transition-transform duration-300">
+            <div key={temple.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 flex flex-col md:flex-row items-start gap-6 transform hover:scale-[1.01] transition-transform duration-300">
               <div className="flex-shrink-0 relative">
                 <img src={temple.imageUrl} alt={temple.name} className="w-24 h-24 md:w-32 md:h-32 rounded-xl object-cover shadow-inner" />
                 <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold shadow-lg border-2 border-white">
@@ -97,29 +98,55 @@ const Rankings = () => {
                 </div>
               </div>
               
-              <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl font-bold text-stone-800">{temple.name}</h2>
-                <p className="text-stone-500 font-medium mb-2">{temple.location}</p>
-                <div className="flex justify-center md:justify-start gap-1 mb-3">
+              <div className="flex-1 text-center md:text-left w-full">
+                <div className="flex flex-col md:flex-row justify-between items-start">
+                    <div>
+                        <h2 className="text-2xl font-bold text-stone-800">{temple.name}</h2>
+                        <p className="text-stone-500 font-medium mb-1 flex items-center gap-1 justify-center md:justify-start">
+                            📍 {temple.address || temple.location}
+                        </p>
+                    </div>
+                    <div className="text-center md:text-right mt-4 md:mt-0">
+                        <div className="text-3xl font-bold text-green-600">{temple.wasteDonatedKg.toLocaleString()}</div>
+                        <div className="text-xs text-stone-400 uppercase font-bold tracking-wider">Kg Waste Recycled</div>
+                    </div>
+                </div>
+
+                <div className="flex justify-center md:justify-start gap-1 my-3">
                    {[...Array(5)].map((_, i) => (
                      <span key={i} className={`text-lg ${i < temple.greenStars ? 'text-yellow-400' : 'text-stone-200'}`}>★</span>
                    ))}
                 </div>
-                <p className="text-sm text-stone-600 italic">"{temple.description}"</p>
-              </div>
+                
+                <p className="text-sm text-stone-600 italic mb-3">"{temple.description}"</p>
 
-              <div className="text-center md:text-right border-t md:border-t-0 md:border-l border-stone-100 pt-4 md:pt-0 md:pl-6 min-w-[150px]">
-                 <div className="text-3xl font-bold text-green-600">{temple.wasteDonatedKg.toLocaleString()}</div>
-                 <div className="text-xs text-stone-400 uppercase font-bold tracking-wider">Kg Waste Recycled</div>
-                 <button 
-                   onClick={() => handleViewPhotos(temple.id, temple.name, temple.imageUrl)}
-                   className="mt-4 text-orange-600 text-sm font-semibold hover:bg-orange-50 px-3 py-1 rounded transition-colors"
-                 >
-                   View Photos
-                 </button>
+                {temple.spocDetails && (
+                  <div className="text-xs bg-stone-100 p-3 rounded-lg inline-block text-left border border-stone-200">
+                    <span className="font-bold text-stone-700 block mb-1">📋 Team Contact (SPOC)</span> 
+                    <span className="block text-stone-600">{temple.spocDetails.name} <span className="text-stone-400">({temple.spocDetails.role})</span></span>
+                    <span className="block text-stone-500">📞 {temple.spocDetails.contact}</span>
+                  </div>
+                )}
+                
+                <div className="mt-4 md:text-right text-center">
+                    <button 
+                    onClick={() => handleViewPhotos(temple.id, temple.name, temple.imageUrl)}
+                    className="text-orange-600 text-sm font-semibold hover:bg-orange-50 px-3 py-1 rounded transition-colors"
+                    >
+                    View Photos
+                    </button>
+                </div>
               </div>
             </div>
           ))}
+          
+          {temples.length === 0 && (
+             <div className="text-center py-20 bg-white rounded-2xl border border-stone-200 shadow-sm">
+                 <p className="text-4xl mb-4">🛕</p>
+                 <h3 className="text-xl font-bold text-stone-800">No Active Temples</h3>
+                 <p className="text-stone-500 mt-2">No temple data available in the rankings at this moment.</p>
+             </div>
+          )}
         </div>
       </div>
 

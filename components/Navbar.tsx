@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { LOGO } from '../constants';
 import { UserRole, User } from '../types';
@@ -47,9 +48,9 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
   };
 
   return (
-    <nav className={`fixed w-full top-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-lg shadow-lg py-1' : 'bg-white py-3 shadow-sm'}`}>
+    <nav className={`fixed w-full top-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-lg py-2' : 'bg-white py-4 shadow-sm'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between items-center h-16">
           {/* Brand Logo */}
           <div className="flex items-center cursor-pointer group" onClick={() => navigate('/')}>
             <div className="flex-shrink-0 flex items-center gap-3">
@@ -68,16 +69,23 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
           </div>
           
           {/* Desktop Links */}
-          <div className="hidden lg:flex items-center space-x-1">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.name} 
-                to={link.path}
-                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${location.pathname === link.path ? 'text-orange-600 bg-orange-50' : 'text-stone-600 hover:text-orange-600 hover:bg-stone-50'}`}
-              >
-                {link.name}
-              </Link>
-            ))}
+          <div className="hidden lg:flex items-center space-x-2">
+            {navLinks.map((link) => {
+              const isActive = location.pathname === link.path;
+              return (
+                <Link 
+                  key={link.name} 
+                  to={link.path}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    isActive 
+                      ? 'bg-orange-600 text-white shadow-md transform scale-105' 
+                      : 'text-stone-600 hover:text-orange-600 hover:bg-orange-50'
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
 
             {user ? (
               <div className="flex items-center gap-3 pl-4 ml-2 border-l border-stone-200">
@@ -118,16 +126,23 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
       {/* Mobile Menu Dropdown */}
       <div className={`lg:hidden bg-white border-t border-stone-100 absolute w-full transition-all duration-300 ease-in-out overflow-hidden shadow-2xl ${isOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
         <div className="px-4 py-4 space-y-2">
-            {navLinks.map((link) => (
-            <Link 
-              key={link.name} 
-              to={link.path}
-              onClick={() => setIsOpen(false)}
-              className="block px-4 py-3 rounded-xl text-base font-medium text-stone-700 hover:text-orange-600 hover:bg-orange-50 transition-colors"
-            >
-              {link.name}
-            </Link>
-          ))}
+            {navLinks.map((link) => {
+              const isActive = location.pathname === link.path;
+              return (
+                <Link 
+                  key={link.name} 
+                  to={link.path}
+                  onClick={() => setIsOpen(false)}
+                  className={`block px-4 py-3 rounded-xl text-base font-medium transition-colors ${
+                    isActive
+                      ? 'bg-orange-50 text-orange-700 border-l-4 border-orange-600 pl-3 shadow-sm'
+                      : 'text-stone-600 hover:text-orange-600 hover:bg-stone-50'
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
           {user ? (
             <div className="pt-4 mt-2 border-t border-stone-100 p-2 bg-stone-50 rounded-xl">
               <div className="flex items-center justify-between mb-4 px-2">
@@ -137,13 +152,13 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout }) => {
               <Link 
                 to={getDashboardLink()}
                 onClick={() => setIsOpen(false)}
-                className="block w-full text-center px-4 py-3 rounded-xl text-base font-bold text-white bg-stone-800 mb-2 shadow-lg"
+                className="block w-full text-center px-4 py-3 rounded-xl text-base font-bold text-white bg-stone-800 mb-2 shadow-lg hover:bg-stone-900 transition-colors"
               >
                 Go to Dashboard
               </Link>
               <button 
                 onClick={() => { onLogout(); setIsOpen(false); }}
-                className="block w-full text-center px-4 py-3 rounded-xl text-base font-medium text-stone-500 hover:text-red-600 hover:bg-white"
+                className="block w-full text-center px-4 py-3 rounded-xl text-base font-medium text-stone-500 hover:text-red-600 hover:bg-white transition-colors"
               >
                 Logout
               </button>

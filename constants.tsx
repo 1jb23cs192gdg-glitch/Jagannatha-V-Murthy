@@ -33,37 +33,7 @@ export const MOCK_TEMPLES: Temple[] = [
     imageUrl: 'https://images.unsplash.com/photo-1561587428-f646d5810006?auto=format&fit=crop&q=80&w=800',
     description: 'Leading the initiative with 100% waste segregation.',
     ngoId: 'n1'
-  },
-  {
-    id: 't2',
-    name: 'Tirumala Tirupati',
-    location: 'Tirupati',
-    wasteDonatedKg: 45000,
-    greenStars: 5,
-    imageUrl: 'https://images.unsplash.com/photo-1582510003544-4d00b7f5feee?auto=format&fit=crop&q=80&w=800',
-    description: 'Massive scale bio-gas production from offerings.',
-    ngoId: 'n2'
-  },
-  {
-    id: 't3',
-    name: 'Somnath Temple',
-    location: 'Gujarat',
-    wasteDonatedKg: 8900,
-    greenStars: 4,
-    imageUrl: 'https://images.unsplash.com/photo-1598889982431-755f84877f86?auto=format&fit=crop&q=80&w=800',
-    description: 'Dedicated to marine conservation through waste management.',
-    ngoId: 'n1'
-  },
-  {
-    id: 't4',
-    name: 'Meenakshi Amman',
-    location: 'Madurai',
-    wasteDonatedKg: 15600,
-    greenStars: 5,
-    imageUrl: 'https://images.unsplash.com/photo-1621831535780-877790b8f276?auto=format&fit=crop&q=80&w=800',
-    description: 'Transforming flower waste into incense.',
-    ngoId: 'n2'
-  },
+  }
 ];
 
 export const MOCK_UPDATES: FlashUpdate[] = [
@@ -72,21 +42,32 @@ export const MOCK_UPDATES: FlashUpdate[] = [
     title: 'New Recycling Plant',
     content: 'We have inaugurated a new flower processing unit in Varanasi.',
     date: '2023-10-25',
-    type: 'MILESTONE'
+    type: 'MILESTONE',
+    audience: 'PUBLIC'
   },
   {
     id: 'u2',
     title: 'Plastic Ban',
-    content: 'All partner temples have achieved 100% single-use plastic free status.',
+    content: 'Strict enforcement of plastic ban in temple premises starting next week.',
     date: '2023-10-20',
-    type: 'ALERT'
+    type: 'ALERT',
+    audience: 'TEMPLE'
   },
   {
     id: 'u3',
     title: 'Green Coins Bonus',
     content: 'Double Green Coins for household donations this Diwali!',
     date: '2023-10-15',
-    type: 'NEWS'
+    type: 'NEWS',
+    audience: 'PUBLIC'
+  },
+  {
+    id: 'u4',
+    title: 'Collection Schedule',
+    content: 'NGO partners requested to complete pickups before 10 AM due to festival rush.',
+    date: '2023-10-28',
+    type: 'ALERT',
+    audience: 'NGO'
   }
 ];
 

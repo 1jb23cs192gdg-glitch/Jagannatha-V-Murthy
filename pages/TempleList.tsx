@@ -1,5 +1,5 @@
+
 import React, { useEffect, useState } from 'react';
-import { MOCK_TEMPLES } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 import { Temple } from '../types';
 
@@ -20,7 +20,7 @@ const TempleList = () => {
       
       if (error) throw error;
 
-      if (data && data.length > 0) {
+      if (data) {
         const formattedTemples: Temple[] = data.map(t => ({
           id: t.id,
           name: t.name,
@@ -33,11 +33,11 @@ const TempleList = () => {
         }));
         setTemples(formattedTemples);
       } else {
-        setTemples(MOCK_TEMPLES); // Fallback for demo
+        setTemples([]);
       }
     } catch (error) {
       console.error("Error fetching temples:", error);
-      setTemples(MOCK_TEMPLES);
+      setTemples([]);
     } finally {
       setLoading(false);
     }
@@ -69,6 +69,12 @@ const TempleList = () => {
               </div>
             </div>
           ))}
+          
+          {temples.length === 0 && (
+             <div className="col-span-full py-20 text-center bg-stone-50 rounded-xl border border-stone-200">
+                <p className="text-stone-400">No partner temples found.</p>
+             </div>
+          )}
         </div>
       </div>
     </div>

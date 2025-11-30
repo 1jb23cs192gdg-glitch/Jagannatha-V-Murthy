@@ -1,33 +1,32 @@
+
 import React from 'react';
 
 const About = () => {
   return (
-    <div className="min-h-screen bg-stone-50 py-16 px-4">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen relative py-16 px-4 overflow-hidden font-sans">
+      {/* Background Image */}
+      <div className="absolute inset-0 z-0">
+        <img 
+          src="https://www.gosahin.com/upload/destinations/1515608449_Tirupati-Balaji1.jpg" 
+          alt="Temple Background" 
+          className="w-full h-full object-cover fixed"
+        />
+        <div className="absolute inset-0 bg-stone-50/90 backdrop-blur-sm"></div>
+      </div>
+
+      <div className="max-w-5xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-16">
           <span className="text-orange-600 font-bold tracking-widest uppercase text-sm">Mission & Vision</span>
           <h1 className="text-4xl md:text-5xl font-bold text-stone-800 mt-2 mb-6">Swadeshi for Atmanirbhar Bharat</h1>
-          <p className="text-xl text-stone-600 max-w-3xl mx-auto leading-relaxed mb-8">
+          <p className="text-xl text-stone-600 max-w-3xl mx-auto leading-relaxed">
             Bridging the gap between ancient traditions and modern sustainability through AI, IoT, and Devotion.
           </p>
-          
-          {/* Featured Image */}
-          <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
-            <img 
-              src="https://i.ytimg.com/vi/SBhfS5cC23Y/maxresdefault.jpg" 
-              alt="Temple Innovation" 
-              className="w-full h-[300px] md:h-[400px] object-cover transform hover:scale-105 transition-transform duration-700"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-center pb-8">
-              <p className="text-white/90 font-medium italic text-lg">"Preserving Sanctity, Protecting Nature"</p>
-            </div>
-          </div>
         </div>
 
         {/* Problem & Solution Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
-          <div className="bg-white p-8 rounded-2xl shadow-sm border-l-4 border-red-500">
+          <div className="bg-white/80 backdrop-blur p-8 rounded-2xl shadow-sm border-l-4 border-red-500">
             <h2 className="text-2xl font-bold text-stone-800 mb-4 flex items-center gap-2">
               <span className="text-3xl">⚠️</span> The Problem
             </h2>
@@ -35,7 +34,7 @@ const About = () => {
               Millions of tons of ritual waste (flowers, coconuts, cloth, plastics) are dumped into rivers annually. This "sacred pollution" causes severe environmental hazards, pollutes aquatic life, and contributes to landfill burdens, contradicting the very Sanatani values of respecting nature (Prakriti).
             </p>
           </div>
-          <div className="bg-white p-8 rounded-2xl shadow-sm border-l-4 border-green-500">
+          <div className="bg-white/80 backdrop-blur p-8 rounded-2xl shadow-sm border-l-4 border-green-500">
             <h2 className="text-2xl font-bold text-stone-800 mb-4 flex items-center gap-2">
               <span className="text-3xl">💡</span> The Solution
             </h2>
@@ -46,25 +45,25 @@ const About = () => {
         </div>
 
         {/* Transformation Showcase */}
-        <div className="bg-white rounded-3xl p-8 md:p-12 shadow-lg mb-16">
-          <h2 className="text-3xl font-bold text-center mb-10">From Waste to Wealth</h2>
+        <div className="bg-white/80 backdrop-blur rounded-3xl p-8 md:p-12 shadow-lg mb-16">
+          <h2 className="text-3xl font-bold text-center mb-10 text-stone-800">From Waste to Wealth</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-             <div className="p-4 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors">
+             <div className="p-4 bg-orange-50/80 rounded-xl border border-orange-100">
                <div className="text-4xl mb-2">🌸</div>
                <h3 className="font-bold text-stone-800">Flowers</h3>
                <p className="text-stone-500 text-sm">To Ayurvedic Oils & Incense</p>
              </div>
-             <div className="p-4 bg-stone-100 rounded-xl hover:bg-stone-200 transition-colors">
+             <div className="p-4 bg-stone-100/80 rounded-xl border border-stone-200">
                <div className="text-4xl mb-2">🥥</div>
                <h3 className="font-bold text-stone-800">Coconuts</h3>
                <p className="text-stone-500 text-sm">To Activated Charcoal</p>
              </div>
-             <div className="p-4 bg-green-50 rounded-xl hover:bg-green-100 transition-colors">
+             <div className="p-4 bg-green-50/80 rounded-xl border border-green-100">
                <div className="text-4xl mb-2">🍚</div>
                <h3 className="font-bold text-stone-800">Rice/Milk</h3>
                <p className="text-stone-500 text-sm">To Bio-fertilizers</p>
              </div>
-             <div className="p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
+             <div className="p-4 bg-blue-50/80 rounded-xl border border-blue-100">
                <div className="text-4xl mb-2">👚</div>
                <h3 className="font-bold text-stone-800">Cloth</h3>
                <p className="text-stone-500 text-sm">To Eco-fabrics & Bags</p>
@@ -73,7 +72,7 @@ const About = () => {
         </div>
 
         {/* Innovation Section */}
-        <div className="text-center bg-stone-900 text-white rounded-3xl p-12">
+        <div className="text-center bg-stone-900/95 backdrop-blur text-white rounded-3xl p-12 shadow-2xl">
            <h2 className="text-3xl font-bold mb-6">Our Core Innovation</h2>
            <div className="flex flex-col md:flex-row justify-center gap-8">
              <div className="flex-1 p-6 border border-stone-700 rounded-xl hover:bg-stone-800 transition-colors">

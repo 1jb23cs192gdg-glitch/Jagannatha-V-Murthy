@@ -1,12 +1,13 @@
+
 import React, { useEffect, useState } from 'react';
 import { MOCK_UPDATES, BowArrowLogo } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { FlashUpdate } from '../types';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Home = () => {
-  const [updates, setUpdates] = useState<FlashUpdate[]>(MOCK_UPDATES);
+  const [updates, setUpdates] = useState<FlashUpdate[]>([]);
   const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   const [videoId, setVideoId] = useState("dQw4w9WgXcQ");
   const [realStats, setRealStats] = useState({
@@ -16,6 +17,8 @@ const Home = () => {
     coins: 0
   });
 
+  const location = useLocation();
+
   const extractVideoId = (url: string) => {
     if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -23,58 +26,59 @@ const Home = () => {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  useEffect(() => {
-    const fetchContent = async () => {
-      // 1. Fetch Flash Updates
-      const { data: updateData, error } = await supabase
-        .from('flash_updates')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (!error && updateData && updateData.length > 0) {
-        const news = updateData.filter(u => u.type !== 'VIDEO_CONFIG');
-        const videoConfig = updateData.find(u => u.type === 'VIDEO_CONFIG');
+  const fetchContent = async () => {
+    // 1. Fetch Flash Updates
+    const { data: updateData, error } = await supabase
+      .from('flash_updates')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error && updateData) {
+      // Filter for PUBLIC or ALL, exclude specialized internal updates
+      const news = updateData.filter((u: any) => u.type !== 'VIDEO_CONFIG' && (u.audience === 'PUBLIC' || u.audience === 'ALL'));
+      const videoConfig = updateData.find((u: any) => u.type === 'VIDEO_CONFIG');
 
-        if (news.length > 0) {
-          setUpdates(news.map(u => ({
-            id: u.id,
-            title: u.title,
-            content: u.content,
-            type: u.type as any,
-            date: new Date(u.created_at).toLocaleDateString()
-          })));
-        }
+      setUpdates(news.map((u: any) => ({
+          id: u.id,
+          title: u.title,
+          content: u.content,
+          type: u.type as any,
+          date: new Date(u.created_at).toLocaleDateString(),
+          audience: u.audience
+      })));
 
-        if (videoConfig && videoConfig.content) {
-          setVideoUrl(videoConfig.content);
-          const id = extractVideoId(videoConfig.content);
-          if (id) setVideoId(id);
-        }
+      if (videoConfig && videoConfig.content) {
+        setVideoUrl(videoConfig.content);
+        const id = extractVideoId(videoConfig.content);
+        if (id) setVideoId(id);
       }
+    } else {
+        setUpdates([]);
+    }
 
-      // 2. Fetch Real Stats
-      // Get all temples to sum waste
-      const { data: templeData } = await supabase.from('temples').select('waste_donated_kg');
-      const totalWaste = templeData ? templeData.reduce((acc, curr) => acc + (curr.waste_donated_kg || 0), 0) : 12400;
-      const templeCount = templeData ? templeData.length : 45;
+    // 2. Fetch Real Stats
+    const { data: templeData } = await supabase.from('temples').select('waste_donated_kg');
+    const totalWaste = templeData ? templeData.reduce((acc: number, curr: any) => acc + (curr.waste_donated_kg || 0), 0) : 0;
+    const templeCount = templeData ? templeData.length : 0;
 
-      // Get user counts
-      const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'PERSON');
-      
-      setRealStats({
-        waste: totalWaste,
-        temples: templeCount,
-        households: userCount || 150, // Default if 0
-        coins: Math.floor(totalWaste * 10) // Approx calculation based on waste
-      });
-    };
+    const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'PERSON');
+    
+    setRealStats({
+      waste: totalWaste,
+      temples: templeCount,
+      households: userCount || 0, 
+      coins: Math.floor(totalWaste * 10) 
+    });
+  };
+
+  useEffect(() => {
     fetchContent();
-  }, []);
+  }, [location.pathname]);
 
   const stats = [
     { label: 'Total Waste Collected', value: `${(realStats.waste / 1000).toFixed(1)} Tons`, icon: '🌿', color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Temples Connected', value: `${realStats.temples}+`, icon: '🛕', color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Households Active', value: `${realStats.households}+`, icon: '🏠', color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Temples Connected', value: `${realStats.temples}`, icon: '🛕', color: 'text-orange-600', bg: 'bg-orange-50' },
+    { label: 'Households Active', value: `${realStats.households}`, icon: '🏠', color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Green Coins Earned', value: `${(realStats.coins / 1000).toFixed(1)}k`, icon: '🪙', color: 'text-yellow-600', bg: 'bg-yellow-50' },
   ];
 
@@ -88,24 +92,44 @@ const Home = () => {
     { name: 'Jul', waste: 3490 },
   ];
 
+  const scrollToRoadmap = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const element = document.getElementById('roadmap');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-stone-50 font-sans">
+    <div className="min-h-screen bg-stone-50 font-sans overflow-x-hidden">
       {/* Hero Section */}
       <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white overflow-hidden">
+        
+        {/* Futuristic Background Layers */}
         <div className="absolute inset-0 z-0">
           <img 
             src="https://www.pspprojects.com/wp-content/uploads/2025/02/01-3-scaled.jpg" 
             alt="Temple Background" 
             className="w-full h-full object-cover scale-105 animate-[pulse_20s_infinite]"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-stone-900/70 via-stone-900/50 to-stone-900"></div>
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-stone-900/80 via-stone-900/60 to-stone-900"></div>
+          
+          {/* Cyber Grid Overlay */}
+          <div className="absolute inset-0 opacity-20 pointer-events-none" 
+             style={{ 
+               backgroundImage: 'linear-gradient(rgba(234, 88, 12, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(234, 88, 12, 0.3) 1px, transparent 1px)', 
+               backgroundSize: '40px 40px',
+               transform: 'perspective(500px) rotateX(60deg) translateY(-100px) scale(2)'
+             }}>
+          </div>
+          
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 animate-pulse"></div>
         </div>
 
         <div className="relative z-10 max-w-5xl px-4 flex flex-col items-center">
-          <div className="mb-8 transform hover:scale-105 transition-transform duration-500">
+          <div className="mb-8 animate-float">
             <div className="relative">
-              <div className="absolute inset-0 bg-orange-500 blur-2xl opacity-30 rounded-full"></div>
+              <div className="absolute inset-0 bg-orange-500 blur-3xl opacity-40 rounded-full animate-pulse-glow"></div>
               <div className="p-6 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 shadow-2xl relative">
                 <BowArrowLogo className="w-20 h-20 md:w-28 md:h-28 rounded-full shadow-inner bg-gradient-to-br from-orange-500 to-red-600 p-5 text-white" color="white" />
               </div>
@@ -113,7 +137,7 @@ const Home = () => {
           </div>
 
           <h1 className="text-5xl md:text-8xl font-bold mb-6 tracking-tight leading-tight drop-shadow-2xl">
-            Temple to <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-yellow-300">Ayurveda</span>
+            Temple to <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-300 to-orange-400 animate-[pulse_4s_infinite]">Ayurveda</span>
           </h1>
           
           <p className="text-lg md:text-2xl mb-10 text-stone-200 font-light max-w-3xl mx-auto drop-shadow-lg leading-relaxed">
@@ -122,12 +146,15 @@ const Home = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-5 justify-center w-full max-w-lg">
-             <Link to="/login" className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-full font-bold text-lg transition-all transform hover:scale-105 hover:shadow-orange-500/50 shadow-xl flex items-center justify-center gap-2">
+             <Link to="/login" className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-full font-bold text-lg transition-all transform hover:scale-105 hover:shadow-[0_0_20px_rgba(234,88,12,0.6)] shadow-xl flex items-center justify-center gap-2 border border-white/20 backdrop-blur-sm">
                <span>🚀</span> Join the Mission
              </Link>
-             <a href="#roadmap" className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/30 text-white hover:bg-white/20 rounded-full font-bold text-lg transition-all flex items-center justify-center gap-2">
+             <button 
+               onClick={scrollToRoadmap}
+               className="px-8 py-4 bg-white/5 backdrop-blur-md border border-white/30 text-white hover:bg-white/10 rounded-full font-bold text-lg transition-all flex items-center justify-center gap-2 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+             >
                <span>🗺️</span> Explore Roadmap
-             </a>
+             </button>
           </div>
         </div>
 
@@ -140,25 +167,30 @@ const Home = () => {
       {/* Flash Updates Ticker */}
       <div className="bg-white border-b border-stone-200 py-3 overflow-hidden relative shadow-sm z-20">
         <div className="max-w-7xl mx-auto px-4 flex items-center">
-           <span className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full mr-4 shadow-md z-10 animate-pulse tracking-wider">LIVE UPDATES</span>
+           <span className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full mr-4 shadow-md z-10 animate-pulse tracking-wider whitespace-nowrap">LIVE UPDATES</span>
            <div className="flex-1 overflow-x-auto hide-scrollbar whitespace-nowrap mask-gradient-right">
              <div className="inline-flex gap-6 animate-[scroll_30s_linear_infinite]">
-                {[...updates, ...updates].map((u, i) => (
-                  <div key={`${u.id}-${i}`} className="inline-flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${u.type === 'ALERT' ? 'bg-red-500' : 'bg-green-500'}`}></span>
-                    <span className="text-sm font-bold text-stone-800 uppercase text-[10px] tracking-wide">{u.title}:</span>
-                    <span className="text-sm text-stone-600">{u.content}</span>
-                    <span className="text-stone-300 mx-2">|</span>
-                  </div>
-                ))}
+                {updates.length === 0 ? (
+                    <span className="text-sm text-stone-500 italic">Welcome to Temple to Ayurveda. Updates will appear here.</span>
+                ) : (
+                    [...updates, ...updates].map((u, i) => (
+                      <div key={`${u.id}-${i}`} className="inline-flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${u.type === 'ALERT' ? 'bg-red-500' : 'bg-green-500'}`}></span>
+                        <span className="text-sm font-bold text-stone-800 uppercase text-[10px] tracking-wide">{u.title}:</span>
+                        <span className="text-sm text-stone-600">{u.content}</span>
+                        <span className="text-stone-300 mx-2">|</span>
+                      </div>
+                    ))
+                )}
              </div>
            </div>
         </div>
       </div>
 
-      {/* Stats Section */}
-      <section id="stats" className="py-24 bg-stone-50">
-        <div className="max-w-7xl mx-auto px-4">
+      {/* Stats Section with Glass Cards */}
+      <section id="stats" className="py-24 bg-stone-50 relative">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+        <div className="max-w-7xl mx-auto px-4 relative z-10">
           <div className="text-center mb-16">
             <span className="text-orange-600 font-bold tracking-widest uppercase text-sm">Our Impact</span>
             <h2 className="text-4xl md:text-5xl font-bold text-stone-800 mt-2">Making a Tangible Difference</h2>
@@ -166,10 +198,11 @@ const Home = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {stats.map((stat, idx) => (
-              <div key={idx} className={`group ${stat.bg} p-8 rounded-3xl border border-stone-100 text-center hover:shadow-2xl hover:shadow-stone-200/50 transition-all duration-500 hover:-translate-y-2`}>
-                <div className="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-500 drop-shadow-sm">{stat.icon}</div>
-                <div className={`text-4xl font-bold ${stat.color} mb-2`}>{stat.value}</div>
-                <div className="text-stone-500 font-bold uppercase tracking-wide text-xs">{stat.label}</div>
+              <div key={idx} className={`group ${stat.bg} p-8 rounded-3xl border border-stone-100 text-center hover:shadow-2xl hover:shadow-stone-200/50 transition-all duration-500 hover:-translate-y-2 relative overflow-hidden`}>
+                <div className="absolute top-0 right-0 w-24 h-24 bg-white opacity-20 rounded-full blur-2xl -translate-y-10 translate-x-10 group-hover:translate-x-5 transition-transform"></div>
+                <div className="text-6xl mb-6 transform group-hover:scale-110 transition-transform duration-500 drop-shadow-sm relative z-10">{stat.icon}</div>
+                <div className={`text-4xl font-bold ${stat.color} mb-2 relative z-10`}>{stat.value}</div>
+                <div className="text-stone-500 font-bold uppercase tracking-wide text-xs relative z-10">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -181,15 +214,15 @@ const Home = () => {
                 <p className="text-stone-600 text-lg leading-relaxed mb-6">
                   We track every kilogram of flower, coconut, and organic waste collected from our partner temples. Our transparency ensures you know exactly how your offering creates impact.
                 </p>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 flex items-center gap-4 mb-4">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 flex items-center gap-4 mb-4 transform hover:scale-105 transition-transform">
                   <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xl">⚡</div>
                   <div>
                     <div className="text-2xl font-bold text-stone-800">{realStats.waste > 1000 ? (realStats.waste/1000).toFixed(1) + ' Tons' : realStats.waste + ' Kg'}</div>
                     <div className="text-xs text-stone-500 uppercase">Processed Total</div>
                   </div>
                 </div>
-                <Link to="/rankings" className="text-orange-600 font-bold hover:underline flex items-center gap-2">
-                  View Temple Rankings <span>→</span>
+                <Link to="/rankings" className="text-orange-600 font-bold hover:underline flex items-center gap-2 group">
+                  View Temple Rankings <span className="group-hover:translate-x-1 transition-transform">→</span>
                 </Link>
              </div>
              
@@ -270,7 +303,7 @@ const Home = () => {
       </section>
 
       {/* Roadmap */}
-      <section id="roadmap" className="py-24 bg-orange-50/50">
+      <section id="roadmap" className="py-24 bg-orange-50/50 scroll-mt-20 relative">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-4xl font-bold text-stone-800 mb-4">The Journey of Devotion</h2>
@@ -286,7 +319,7 @@ const Home = () => {
                { title: 'Processing', desc: 'Conversion to Gas, Compost, Products', icon: '⚗️' },
                { title: 'Distribution', desc: 'Eco-products back to the community', icon: '🎁' }
              ].map((step, i) => (
-               <div key={i} className="relative z-10 bg-white p-8 rounded-3xl shadow-xl shadow-stone-200/50 border border-stone-100 flex flex-col items-center text-center hover:-translate-y-3 transition-transform duration-300 group">
+               <div key={i} className="relative z-10 bg-white/80 backdrop-blur p-8 rounded-3xl shadow-xl shadow-stone-200/50 border border-stone-100 flex flex-col items-center text-center hover:-translate-y-3 transition-transform duration-300 group">
                   <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-4xl mb-6 shadow-inner group-hover:scale-110 transition-transform duration-300">
                     {step.icon}
                   </div>

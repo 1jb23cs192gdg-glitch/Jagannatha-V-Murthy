@@ -1,132 +1,91 @@
-import React from 'react';
-import { SHOPPING_URL } from '../constants';
 
-const PRODUCTS = [
-  {
-    id: 1,
-    name: "Nirmalya Incense Sticks",
-    description: "Hand-rolled from recycled temple flowers. Charcoal-free & chemical-free.",
-    price: 150,
-    coins: 50,
-    image: "https://images.unsplash.com/photo-1608649852336-7c98e25d481f?q=80&w=600&auto=format&fit=crop",
-    tag: "Bestseller"
-  },
-  {
-    id: 2,
-    name: "Organic Vermicompost",
-    description: "Nutrient-rich soil booster made from ritual organic waste and flowers.",
-    price: 300,
-    coins: 100,
-    image: "https://images.unsplash.com/photo-1622383563227-0440114f6869?q=80&w=600&auto=format&fit=crop",
-    tag: "Gardening"
-  },
-  {
-    id: 3,
-    name: "Coconut Shell Bowl",
-    description: "Eco-friendly polished bowls made from offered coconuts.",
-    price: 250,
-    coins: 80,
-    image: "https://images.unsplash.com/photo-1616409890479-78ae810c9d72?q=80&w=600&auto=format&fit=crop",
-    tag: "Handicraft"
-  },
-  {
-    id: 4,
-    name: "Bio-Enzyme Cleaner",
-    description: "Natural citrus cleaner made from fruit offerings. Pet safe.",
-    price: 180,
-    coins: 60,
-    image: "https://images.unsplash.com/photo-1585832770485-e68a5db8e155?q=80&w=600&auto=format&fit=crop",
-    tag: "Home Care"
-  },
-  {
-    id: 5,
-    name: "Upcycled Cloth Bag",
-    description: "Stitched by women SHGs using clean temple fabrics.",
-    price: 100,
-    coins: 30,
-    image: "https://images.unsplash.com/photo-1597484661643-2f6f3320387c?q=80&w=600&auto=format&fit=crop",
-    tag: "Fashion"
-  },
-  {
-    id: 6,
-    name: "Temple Holi Colors",
-    description: "100% natural herbal colors extracted from flower petals.",
-    price: 400,
-    coins: 150,
-    image: "https://images.unsplash.com/photo-1615926578988-c8753239c878?q=80&w=600&auto=format&fit=crop",
-    tag: "Festive"
-  }
-];
+import React, { useEffect, useState } from 'react';
+import { SHOPPING_URL } from '../constants';
+import { supabase } from '../lib/supabaseClient';
 
 const Shop = () => {
-  const handleBuy = (productName: string) => {
-    alert(`Added ${productName} to cart! Proceed to checkout to redeem coins.`);
-  };
+  const [shopUrl, setShopUrl] = useState(SHOPPING_URL);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchShopConfig = async () => {
+      try {
+        // Fetch dynamic URL set by admin, fallback to constant
+        const { data } = await supabase.from('site_config').select('url').eq('id', 'shop_url').single();
+        if (data && data.url) {
+          setShopUrl(data.url);
+        }
+      } catch (error) {
+        console.error("Error fetching shop config:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchShopConfig();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-stone-50 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-stone-50 py-12 px-4 flex flex-col items-center justify-center">
+      <div className="max-w-4xl w-full">
         
+        {/* Header */}
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold text-stone-800 mb-4">Temple Eco-Shop</h1>
+          <p className="text-stone-600 text-lg">Purchase sustainable, authentic Ayurvedic products made from recycled temple offerings.</p>
+        </div>
+
         {/* External Link Highlight Banner */}
-        <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-2xl p-8 mb-12 text-center text-white shadow-xl relative overflow-hidden">
-           <div className="relative z-10">
-             <h2 className="text-3xl font-bold mb-4">Official Eco-Product Store</h2>
-             <p className="text-orange-100 mb-8 max-w-2xl mx-auto text-lg">
-               Browse our full catalog of Ayurvedic medicines, sustainable temple products, and bulk orders on our dedicated partner website.
+        <div className="bg-white rounded-3xl p-10 md:p-16 text-center shadow-2xl border border-stone-200 relative overflow-hidden group">
+           
+           <div className="relative z-10 flex flex-col items-center">
+             <div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform duration-500">
+               🛍️
+             </div>
+
+             <h2 className="text-3xl md:text-4xl font-bold mb-6 text-stone-800">Visit Our Partner Store</h2>
+             
+             <p className="text-stone-600 mb-10 max-w-2xl mx-auto text-lg leading-relaxed">
+               We have moved our inventory to a dedicated platform to serve you better. 
+               Browse our full catalog of <strong>Nirmalya Incense</strong>, <strong>Vermicompost</strong>, 
+               and <strong>Bio-Enzymes</strong> on our official e-commerce website.
              </p>
-             <a 
-               href={SHOPPING_URL}
-               target="_blank"
-               rel="noreferrer"
-               className="bg-white text-orange-700 px-10 py-4 rounded-full font-bold hover:bg-orange-50 inline-block shadow-lg transform hover:scale-105 transition-all text-lg"
-             >
-               Start Shopping Now ↗
-             </a>
+             
+             {loading ? (
+                <div className="animate-pulse bg-stone-200 h-12 w-48 rounded-full"></div>
+             ) : (
+                <a 
+                  href={shopUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-10 py-5 rounded-full font-bold text-xl hover:shadow-orange-500/40 shadow-xl transform hover:scale-105 transition-all flex items-center gap-2"
+                >
+                  Start Shopping Now 
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                </a>
+             )}
+
+             <p className="mt-6 text-sm text-stone-400">
+               You will be redirected to an external secure payment gateway.
+             </p>
            </div>
-           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+           
+           {/* Background Decorations */}
+           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 via-red-500 to-orange-400"></div>
+           <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-orange-50 rounded-full blur-3xl opacity-50"></div>
+           <div className="absolute -top-20 -left-20 w-64 h-64 bg-green-50 rounded-full blur-3xl opacity-50"></div>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-stone-800 mb-1">Redeem Green Coins</h1>
-            <p className="text-stone-600 text-sm">Use your earned credits for exclusive discounts.</p>
-          </div>
-          <span className="bg-green-100 text-green-800 px-4 py-2 rounded-lg font-bold border border-green-200 flex items-center">
-             Your Balance: 0 Coins
-          </span>
+        {/* Categories Preview (Static Visual Only) */}
+        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 opacity-70">
+           {['Incense Sticks', 'Essential Oils', 'Organic Manure', 'Holi Colors'].map((cat, i) => (
+             <div key={i} className="text-center p-4">
+               <div className="h-1 bg-stone-200 rounded mb-2 w-1/2 mx-auto"></div>
+               <span className="text-stone-400 font-bold uppercase text-xs">{cat}</span>
+             </div>
+           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-          {PRODUCTS.map(product => (
-            <div key={product.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-stone-200 hover:shadow-xl transition-shadow group">
-              <div className="relative h-64 overflow-hidden">
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                <span className="absolute top-4 left-4 bg-white/90 backdrop-blur text-stone-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                  {product.tag}
-                </span>
-              </div>
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-lg text-stone-800">{product.name}</h3>
-                </div>
-                <p className="text-stone-500 text-sm mb-4 line-clamp-2">{product.description}</p>
-                
-                <div className="flex items-center justify-between pt-4 border-t border-stone-100">
-                  <div>
-                    <span className="block text-lg font-bold text-stone-800">₹{product.price}</span>
-                    <span className="text-xs text-orange-600 font-bold">OR {product.coins} Coins</span>
-                  </div>
-                  <button 
-                    onClick={() => handleBuy(product.name)}
-                    className="bg-stone-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-black transition-colors"
-                  >
-                    Redeem
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

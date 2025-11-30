@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
 
@@ -16,7 +17,7 @@ interface Message {
 const AIChatBot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: 'Namaste! I am your AI Ayurveda Guide. Ask me anything about recycling, temple activities, or click "Fast Tip" for a quick fact!' }
+    { role: 'model', text: 'Namaste! I am VEDA, your AI Sustainability Guide. How can I assist you in your eco-spiritual journey today?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -40,14 +41,13 @@ const AIChatBot = () => {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      // Switched to gemini-2.5-flash for reliable text chat
-      const model = 'gemini-2.5-flash';
+      const model = 'gemini-3-pro-preview';
       
       const response = await ai.models.generateContent({
         model: model,
         contents: userMsg,
         config: {
-          systemInstruction: "You are a helpful assistant for 'Temple to Ayurveda', an app that recycles temple waste into ayurvedic products. Be polite, knowledgeable about Indian culture, and emphasize sustainability.",
+          systemInstruction: "You are VEDA (Virtual Eco-Devotion Assistant), a highly advanced AI for 'Temple to Ayurveda'. You are polite, knowledgeable about Indian culture, Vedas, and modern recycling technology. Your tone is serene yet futuristic.",
         }
       });
 
@@ -55,30 +55,8 @@ const AIChatBot = () => {
       setMessages(prev => [...prev, { role: 'model', text }]);
 
     } catch (error) {
-      console.error("ChatBot Error:", error);
-      let errMsg = "Sorry, I encountered an error connecting to the service.";
-      if (error instanceof Error) {
-         if (error.message.includes("API key")) errMsg = "API Key Error: Please check configuration.";
-      }
-      setMessages(prev => [...prev, { role: 'model', text: errMsg }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleFastTip = async () => {
-    setIsLoading(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      // Using Flash-Lite for fast, simple tasks
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite-latest',
-        contents: "Give me one short, fascinating sentence about Ayurveda or waste recycling.",
-      });
-      setMessages(prev => [...prev, { role: 'model', text: "⚡ Fast Tip: " + (response.text || "Recycling saves nature!") }]);
-    } catch (error) {
-      console.error("Fast Tip Error:", error);
-      setMessages(prev => [...prev, { role: 'model', text: "Could not fetch tip at the moment." }]);
+      console.error(error);
+      setMessages(prev => [...prev, { role: 'model', text: "Connection interrupted. Re-aligning satellites..." }]);
     } finally {
       setIsLoading(false);
     }
@@ -86,82 +64,97 @@ const AIChatBot = () => {
 
   return (
     <>
+      {/* Holographic Orb Button */}
       <button 
-        onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 p-4 bg-orange-600 text-white rounded-full shadow-2xl hover:bg-orange-700 transition-all z-50 ${isOpen ? 'hidden' : 'block'}`}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`fixed bottom-6 right-6 z-50 group transition-all duration-500 ${isOpen ? 'rotate-90 scale-0 opacity-0' : 'scale-100 opacity-100'}`}
       >
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-      </button>
-
-      {isOpen && (
-        <div className="fixed bottom-6 right-6 w-80 md:w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-stone-200 font-sans">
-          {/* Header */}
-          <div className="bg-orange-600 p-4 text-white flex justify-between items-center">
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              <span>🕉️</span> AI Guide
-            </h3>
-            <button onClick={() => setIsOpen(false)} className="hover:bg-orange-700 p-1 rounded">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-stone-50 p-2 border-b border-stone-200 flex justify-center">
-             <button 
-               onClick={handleFastTip}
-               className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-semibold border border-yellow-200 hover:bg-yellow-200 transition-colors flex items-center gap-1"
-             >
-               ⚡ Get Fast Tip (Flash-Lite)
-             </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-stone-50">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-xl p-3 text-sm ${
-                  msg.role === 'user' 
-                    ? 'bg-orange-600 text-white rounded-br-none' 
-                    : 'bg-white border border-stone-200 text-stone-800 rounded-bl-none shadow-sm'
-                }`}>
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-               <div className="flex justify-start">
-                 <div className="bg-white border border-stone-200 p-3 rounded-xl rounded-bl-none text-stone-500 text-xs flex items-center gap-1">
-                   <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce"></div>
-                   <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                   <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                 </div>
-               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="p-4 bg-white border-t border-stone-200">
-             <div className="flex items-center gap-2">
-               <input 
-                 type="text" 
-                 value={input}
-                 onChange={(e) => setInput(e.target.value)}
-                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                 placeholder="Type your question..." 
-                 className="flex-1 border border-stone-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-orange-500"
-               />
-               <button 
-                 onClick={handleSend}
-                 disabled={!input.trim()}
-                 className="bg-orange-600 text-white p-2 rounded-full hover:bg-orange-700 disabled:opacity-50"
-               >
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-               </button>
-             </div>
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 bg-orange-600 rounded-full blur-lg opacity-75 animate-pulse-glow"></div>
+          <div className="relative w-full h-full bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center border-2 border-white/30 shadow-2xl overflow-hidden">
+             {/* Rotating Ring */}
+             <div className="absolute w-full h-full border-2 border-dashed border-white/40 rounded-full animate-[spin_10s_linear_infinite]"></div>
+             <span className="text-2xl animate-float">🕉️</span>
           </div>
         </div>
-      )}
+      </button>
+
+      {/* Glassmorphism Chat Interface */}
+      <div 
+        className={`fixed bottom-6 right-6 w-80 md:w-96 h-[550px] rounded-3xl shadow-2xl flex flex-col overflow-hidden z-50 transition-all duration-500 border border-white/20 backdrop-blur-2xl ${
+          isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-75 opacity-0 translate-y-20 pointer-events-none'
+        }`}
+        style={{ background: 'rgba(23, 23, 23, 0.85)' }}
+      >
+        {/* Header */}
+        <div className="bg-gradient-to-r from-orange-600/90 to-red-600/90 p-4 flex justify-between items-center backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center backdrop-blur border border-white/30">
+              <span className="text-xs">🤖</span>
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm tracking-wider">VEDA AI</h3>
+              <p className="text-[10px] text-orange-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span> Online
+              </p>
+            </div>
+          </div>
+          <button onClick={() => setIsOpen(false)} className="text-white/70 hover:text-white transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        {/* Neural Grid Background */}
+        <div className="absolute inset-0 z-0 opacity-10 pointer-events-none" 
+             style={{ backgroundImage: 'radial-gradient(circle, #ea580c 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-thin scrollbar-thumb-orange-600/50 scrollbar-track-transparent">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+              <div className={`max-w-[85%] rounded-2xl p-3 text-sm backdrop-blur-sm ${
+                msg.role === 'user' 
+                  ? 'bg-orange-600/90 text-white rounded-br-sm shadow-[0_4px_15px_rgba(234,88,12,0.3)]' 
+                  : 'bg-white/10 border border-white/10 text-stone-100 rounded-bl-sm shadow-sm'
+              }`}>
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+             <div className="flex justify-start">
+               <div className="bg-white/10 border border-white/10 p-3 rounded-2xl rounded-bl-none flex items-center gap-1.5">
+                 <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                 <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                 <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+               </div>
+             </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 bg-black/20 backdrop-blur-md border-t border-white/10 relative z-10">
+           <div className="relative">
+             <input 
+               type="text" 
+               value={input}
+               onChange={(e) => setInput(e.target.value)}
+               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+               placeholder="Ask VEDA anything..." 
+               className="w-full bg-white/5 border border-white/10 rounded-full pl-4 pr-12 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-orange-500/50 focus:bg-white/10 transition-all shadow-inner"
+             />
+             <button 
+               onClick={handleSend}
+               disabled={!input.trim()}
+               className="absolute right-1 top-1 p-2 bg-gradient-to-r from-orange-600 to-red-600 rounded-full text-white hover:shadow-[0_0_10px_rgba(234,88,12,0.6)] transition-all disabled:opacity-50 disabled:shadow-none"
+             >
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+             </button>
+           </div>
+        </div>
+      </div>
     </>
   );
 };
