@@ -40,7 +40,8 @@ const AIChatBot = () => {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const model = 'gemini-3-pro-preview';
+      // Switched to gemini-2.5-flash for reliable text chat
+      const model = 'gemini-2.5-flash';
       
       const response = await ai.models.generateContent({
         model: model,
@@ -54,8 +55,12 @@ const AIChatBot = () => {
       setMessages(prev => [...prev, { role: 'model', text }]);
 
     } catch (error) {
-      console.error(error);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I encountered an error connecting to the service." }]);
+      console.error("ChatBot Error:", error);
+      let errMsg = "Sorry, I encountered an error connecting to the service.";
+      if (error instanceof Error) {
+         if (error.message.includes("API key")) errMsg = "API Key Error: Please check configuration.";
+      }
+      setMessages(prev => [...prev, { role: 'model', text: errMsg }]);
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +77,8 @@ const AIChatBot = () => {
       });
       setMessages(prev => [...prev, { role: 'model', text: "⚡ Fast Tip: " + (response.text || "Recycling saves nature!") }]);
     } catch (error) {
-      console.error(error);
+      console.error("Fast Tip Error:", error);
+      setMessages(prev => [...prev, { role: 'model', text: "Could not fetch tip at the moment." }]);
     } finally {
       setIsLoading(false);
     }
