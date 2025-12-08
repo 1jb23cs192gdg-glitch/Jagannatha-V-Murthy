@@ -1,5 +1,3 @@
-
-// ... (imports remain the same)
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Temple, FlashUpdate, PickupRequest, TemplePhoto, UserRole } from '../../types';
@@ -10,7 +8,6 @@ interface DashboardProps { onLogout?: () => void; }
 
 const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [temple, setTemple] = useState<Temple | null>(null);
-  // ... (state definitions)
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [wasteInput, setWasteInput] = useState({ 
       type: 'Flower Waste', 
@@ -22,7 +19,6 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   });
   const [adminUpdates, setAdminUpdates] = useState<FlashUpdate[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
-  // coinBalance is less relevant for Temples now, focusing on Stars, but keeping calculation valid to avoid errors if used elsewhere
   const [coinBalance, setCoinBalance] = useState(0);
   const [pickups, setPickups] = useState<PickupRequest[]>([]);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
@@ -39,7 +35,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   
   // Real-time polling for updates when on Overview
   useEffect(() => {
-      let interval: NodeJS.Timeout;
+      let interval: any;
       if (activeTab === 'OVERVIEW') {
           fetchTempleData(); // Initial fetch on switch
           interval = setInterval(fetchTempleData, 5000); // Poll every 5s for updates
@@ -66,12 +62,10 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       } 
   }, [temple]);
 
-  // ... (fetchUpdates, fetchWasteLogs, fetchPickups, fetchGallery remain same)
-
   const fetchUpdates = async () => {
     const { data } = await supabase.from('flash_updates').select('*').order('created_at', { ascending: false });
     if (data) {
-        setAdminUpdates(data.filter(d => d.audience === 'ALL' || d.audience === 'PUBLIC' || d.audience === temple?.id || d.audience === 'TEMPLE').slice(0,5));
+        setAdminUpdates(data.filter((d: any) => d.audience === 'ALL' || d.audience === 'PUBLIC' || d.audience === temple?.id || d.audience === 'TEMPLE').slice(0,5));
     }
   };
   const fetchWasteLogs = async () => {
@@ -175,7 +169,6 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       }
   }
 
-  // ... (handleUpdateProfile, handleUploadGallery, handleDeletePhoto, handleRateNgo, handleDownloadReport remain same)
   const handleUpdateProfile = async () => {
       if(!temple) return;
       await supabase.from('temples').update({

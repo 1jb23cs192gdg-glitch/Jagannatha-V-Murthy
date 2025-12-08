@@ -74,7 +74,9 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           role: 'PERSON', 
           imageUrl: data.image_url,
           greenCoins: data.green_coins || 0,
-          wasteDonatedKg: data.waste_donated_kg || 0
+          wasteDonatedKg: data.waste_donated_kg || 0,
+          assignedDuId: data.assigned_du_id || data.assignedDuId,
+          assignedNgoId: data.assigned_ngo_id || data.assignedNgoId
       });
     }
   };
@@ -150,12 +152,12 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       if (!wasteInput.address) return alert("Please confirm your pickup address.");
       if (!wasteInput.photo) return alert("Please upload a photo for proof.");
       
-      const ngoId = profile.assignedNgoId || 'ngo1'; 
+      const duId = profile.assignedDuId || 'du1'; 
       
       await supabase.from('pickup_requests').insert([{ 
           requester_id: profile.id, 
           requester_type: 'USER',
-          ngo_id: ngoId, 
+          ngo_id: duId, 
           status: 'PENDING',
           estimated_weight: parseFloat(wasteInput.amount), 
           waste_type: wasteInput.type, 
@@ -165,7 +167,7 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           image_url: wasteInput.photo, 
           created_at: new Date().toISOString()
       }]);
-      alert("Pickup Request Sent! NGO will review, assign a driver, and you will be notified."); 
+      alert("Pickup Request Sent! Drying Unit will review, assign a driver, and you will be notified."); 
       setWasteInput({ type: 'Flower Waste', amount: '', photo: null, address: profile.address || '' });
       setActiveTab('HISTORY');
       fetchHistory();
@@ -211,7 +213,7 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           alert("Error updating status. Please try again.");
       } else {
           fetchHistory();
-          alert("Status updated to Loaded! Waiting for NGO final confirmation.");
+          alert("Status updated to Loaded! Waiting for Drying Unit confirmation.");
       }
   }
 
@@ -233,16 +235,16 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       setRatingInput({ rating: 5, reason: '' });
   };
 
-  const handleRateAssignedNgo = async () => {
-      if(!profile || !profile.assignedNgoId) return alert("No NGO assigned.");
+  const handleRateAssignedDu = async () => {
+      if(!profile || !profile.assignedDuId) return alert("No Drying Unit assigned.");
       await supabase.from('ratings').insert([{
           from_id: profile.id,
-          to_id: profile.assignedNgoId,
+          to_id: profile.assignedDuId,
           rating: profileRatingInput.rating,
           reason: profileRatingInput.reason,
           created_at: new Date().toISOString()
       }]);
-      alert("Profile Feedback sent!");
+      alert("Feedback sent to Drying Unit!");
       setProfileRatingInput({ rating: 5, reason: '' });
   };
 
@@ -358,7 +360,7 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           </label>
                       </div>
                       
-                      <button onClick={handleSubmitWaste} className="w-full py-3 bg-green-500 text-white font-bold rounded-xl shadow-lg hover:bg-green-600 transition-colors">Request NGO Pickup</button>
+                      <button onClick={handleSubmitWaste} className="w-full py-3 bg-green-500 text-white font-bold rounded-xl shadow-lg hover:bg-green-600 transition-colors">Request Drying Unit Pickup</button>
                   </div>
               </div>
           )}
@@ -540,11 +542,11 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                     )}
                                     
                                     {p.status === 'LOADED' && (
-                                        <span className="text-[10px] text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-100">Waiting for NGO Confirmation</span>
+                                        <span className="text-[10px] text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-100">Waiting for DU Confirmation</span>
                                     )}
 
                                     {p.status === 'COMPLETED' && (
-                                        <button onClick={() => openRatingModal(p.ngo_id)} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border hover:bg-slate-200">Rate NGO</button>
+                                        <button onClick={() => openRatingModal(p.ngo_id)} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border hover:bg-slate-200">Rate DU</button>
                                     )}
                                   </div>
                               </div>
@@ -597,14 +599,14 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                   
                   <div className="text-left space-y-4">
                       <div className="p-3 bg-white/50 rounded-xl">
-                          <label className="text-xs text-slate-400 font-bold uppercase block mb-1">Assigned NGO</label>
-                          <p className="text-slate-700 font-medium">{profile.assignedNgoId || 'Verified Partner NGO'}</p>
+                          <label className="text-xs text-slate-400 font-bold uppercase block mb-1">Assigned Drying Unit</label>
+                          <p className="text-slate-700 font-medium">{profile.assignedDuId || 'Not Assigned'}</p>
                       </div>
                   </div>
 
-                  {/* Added Rate Your NGO Section */}
+                  {/* Added Rate Your DU Section */}
                   <div className="mt-8 pt-8 border-t border-slate-200">
-                      <h4 className="font-bold text-slate-700 mb-4">Rate Your Partner NGO</h4>
+                      <h4 className="font-bold text-slate-700 mb-4">Rate Your Drying Unit</h4>
                       <div className="flex gap-2 mb-2 justify-center">
                           {[1,2,3,4,5].map(s => (
                               <button key={s} onClick={() => setProfileRatingInput({...profileRatingInput, rating: s})} className={`text-2xl ${profileRatingInput.rating >= s ? 'text-yellow-400' : 'text-gray-200'}`}>★</button>
@@ -616,7 +618,7 @@ const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           value={profileRatingInput.reason} 
                           onChange={e => setProfileRatingInput({...profileRatingInput, reason: e.target.value})}
                       ></textarea>
-                      <button onClick={handleRateAssignedNgo} className="text-xs bg-orange-100 text-orange-600 px-3 py-1 rounded font-bold hover:bg-orange-200">Submit Rating</button>
+                      <button onClick={handleRateAssignedDu} className="text-xs bg-orange-100 text-orange-600 px-3 py-1 rounded font-bold hover:bg-orange-200">Submit Rating</button>
                   </div>
               </div>
           )}
