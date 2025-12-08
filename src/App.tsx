@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -14,15 +13,12 @@ import Connect from './pages/Connect';
 import AIStudio from './pages/AIStudio';
 import WasteAnalysis from './pages/WasteAnalysis';
 import Shop from './pages/Shop';
-import Training from './pages/Training';
 import NotFound from './pages/NotFound';
-import TrackDriver from './pages/TrackDriver';
 import AIChatBot from './components/AIChatBot';
 import AdminDashboard from './pages/dashboards/AdminDashboard';
 import TempleDashboard from './pages/dashboards/TempleDashboard';
 import NgoDashboard from './pages/dashboards/NgoDashboard';
 import UserDashboard from './pages/dashboards/UserDashboard';
-import DryingUnitDashboard from './pages/dashboards/DryingUnitDashboard';
 import { User, UserRole } from './types';
 import { supabase } from './lib/supabaseClient';
 import { BowArrowLogo } from './constants';
@@ -53,19 +49,15 @@ interface LayoutManagerProps {
 
 const LayoutManager = ({ children, user, onLogout }: LayoutManagerProps) => {
   const location = useLocation();
-  // Hide Navbar/Footer for Dashboards AND the Tracking Page
   const isDashboard = location.pathname.includes('dashboard');
-  const isTracking = location.pathname.includes('/track/');
-
-  const hideChrome = isDashboard || isTracking;
 
   return (
     <div className="flex flex-col min-h-screen dark:bg-slate-900">
-      {!hideChrome && <Navbar user={user} onLogout={onLogout} />}
-      <main className={!hideChrome ? "flex-grow pt-20" : "flex-grow"}>
+      {!isDashboard && <Navbar user={user} onLogout={onLogout} />}
+      <main className={!isDashboard ? "flex-grow pt-20" : "flex-grow"}>
         {children}
       </main>
-      {!hideChrome && <Footer />}
+      {!isDashboard && <Footer />}
       <AIChatBot />
     </div>
   );
@@ -162,6 +154,7 @@ const App = () => {
   };
 
   const handleLogout = async () => {
+    localStorage.removeItem('temple_mock_session'); 
     await supabase.auth.signOut();
     setUser(null);
   };
@@ -188,14 +181,10 @@ const App = () => {
             <Route path="/ai-studio" element={<AIStudio />} />
             <Route path="/scan" element={<WasteAnalysis />} />
             <Route path="/shop" element={<Shop />} />
-            <Route path="/training" element={<Training />} />
             <Route path="/guidelines" element={<Guidelines />} />
             <Route path="/faqs" element={<Faqs />} />
             <Route path="/connect" element={<Connect />} />
             <Route path="/login" element={<Login onLogin={handleLogin} />} />
-            
-            {/* New Route for Tracking */}
-            <Route path="/track/:id" element={<TrackDriver />} />
             
             {/* Protected Dashboards */}
             <Route path="/admin-dashboard" element={
@@ -206,11 +195,6 @@ const App = () => {
             <Route path="/temple-dashboard" element={
               <ProtectedRoute user={user} loading={loading} allowedRoles={[UserRole.TEMPLE]}>
                 <TempleDashboard onLogout={handleLogout} />
-              </ProtectedRoute>
-            } />
-            <Route path="/du-dashboard" element={
-              <ProtectedRoute user={user} loading={loading} allowedRoles={[UserRole.DRYING_UNIT]}>
-                <DryingUnitDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } />
             <Route path="/ngo-dashboard" element={

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { GoogleGenAI } from "@google/genai";
 
@@ -29,7 +30,6 @@ const WasteAnalysis = () => {
     setLoading(true);
 
     try {
-      // Extract base64 data (remove "data:image/jpeg;base64," prefix)
       const base64Data = image.split(',')[1];
       const mimeType = image.split(';')[0].split(':')[1];
 
@@ -37,10 +37,18 @@ const WasteAnalysis = () => {
       
       const prompt = `
         Analyze this image of temple/ritual waste. 
-        Identify the items (e.g., Flowers, Coconuts, Plastic, Incense sticks, Cloth, Ash).
+        Identify the items (e.g., Flowers, Coconuts, Plastic, Incense sticks, Cloth, Ash, Paper).
         Estimate the composition percentage.
         Determine if it is Biodegradable or Non-biodegradable.
         Suggest the recycling output (e.g., Flowers -> Incense, Coconut -> Biofuel).
+        
+        CRITICAL: Recommend the correct Bin(s) for the detected waste types from these options:
+        1. "Flower Waste Bin" (for flowers, garlands, organic soft waste)
+        2. "Plastic Waste Bin" (for bottles, wrappers, packets, non-biodegradable)
+        3. "Coconut Shell Bin" (for hard coconut shells)
+        4. "Paper/Cloth Bin" (for books, paper, religious cloth, chunri)
+
+        If the image contains mixed waste (e.g. flowers mixed with plastic bottles), suggest MULTIPLE bins so the user can segregate them.
         
         Return the response in this JSON format ONLY:
         {
@@ -48,6 +56,7 @@ const WasteAnalysis = () => {
             {"name": "Item Name", "category": "Bio/Non-Bio", "percentage": "XX%", "recycleOutput": "Product Name"}
           ],
           "overallRecyclability": "High/Medium/Low",
+          "recommendedBins": ["Bin Name 1", "Bin Name 2"],
           "summary": "One sentence summary"
         }
       `;
@@ -78,6 +87,15 @@ const WasteAnalysis = () => {
     }
   };
 
+  const getBinColor = (binName: string) => {
+      if (!binName) return 'bg-gray-600 shadow-gray-200';
+      const name = binName.toLowerCase();
+      if (name.includes('plastic')) return 'bg-blue-600 shadow-blue-200';
+      if (name.includes('coconut')) return 'bg-amber-800 shadow-amber-200';
+      if (name.includes('paper') || name.includes('cloth')) return 'bg-yellow-600 shadow-yellow-200';
+      return 'bg-green-600 shadow-green-200'; 
+  };
+
   return (
     <div className="min-h-screen bg-stone-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -88,7 +106,6 @@ const WasteAnalysis = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Upload Section */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
             <h3 className="font-bold text-lg mb-4 text-stone-800">1. Upload Image</h3>
             <div className="border-2 border-dashed border-stone-300 rounded-xl min-h-[300px] flex flex-col items-center justify-center p-4 bg-stone-50 relative overflow-hidden">
@@ -112,16 +129,22 @@ const WasteAnalysis = () => {
               disabled={!image || loading}
               className="w-full mt-4 bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-700 disabled:opacity-50 transition-colors flex justify-center items-center gap-2"
             >
-              {loading ? 'Analyzing...' : '🔍 Identify & Segregate'}
+              {loading ? (
+                <>
+                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                   Analyzing...
+                </>
+              ) : (
+                '🔍 Identify & Segregate'
+              )}
             </button>
           </div>
 
-          {/* Results Section */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
             <h3 className="font-bold text-lg mb-4 text-stone-800">2. AI Analysis Results</h3>
             
             {analysis ? (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-fade-in">
                 <div className={`p-4 rounded-xl border-l-4 ${analysis.overallRecyclability === 'High' ? 'bg-green-50 border-green-500' : 'bg-yellow-50 border-yellow-500'}`}>
                   <p className="font-bold text-stone-800">Summary</p>
                   <p className="text-sm text-stone-600">{analysis.summary}</p>
@@ -129,7 +152,7 @@ const WasteAnalysis = () => {
 
                 <div className="space-y-3">
                   <p className="font-semibold text-sm text-stone-500 uppercase tracking-wider">Detected Composition</p>
-                  {analysis.items.map((item: any, idx: number) => (
+                  {analysis.items.length > 0 ? analysis.items.map((item: any, idx: number) => (
                     <div key={idx} className="flex justify-between items-center bg-stone-50 p-3 rounded-lg border border-stone-100">
                       <div>
                         <div className="font-bold text-stone-800">{item.name}</div>
@@ -139,15 +162,25 @@ const WasteAnalysis = () => {
                         <div className="font-bold text-stone-700">{item.percentage}</div>
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-stone-500 italic text-sm text-center py-4 bg-stone-50 rounded-lg">No item detected</p>
+                  )}
                 </div>
 
-                <div className="pt-4 border-t border-stone-100 text-center">
-                  <p className="text-sm text-stone-500 mb-2">Based on this analysis, this waste should go to:</p>
-                  <div className="inline-block bg-green-600 text-white px-6 py-2 rounded-full font-bold shadow-lg shadow-green-200">
-                    Bin A (Organic)
-                  </div>
-                </div>
+                {/* Only show bin suggestion if items were actually detected */}
+                {analysis.items.length > 0 && (
+                    <div className="pt-4 border-t border-stone-100 text-center">
+                      <p className="text-sm text-stone-500 mb-3">Segregate items into these bins:</p>
+                      <div className="flex flex-wrap justify-center gap-3">
+                        {analysis.recommendedBins?.map((bin: string, i: number) => (
+                           <div key={i} className={`inline-flex items-center gap-2 text-white px-5 py-2 rounded-full font-bold shadow-lg transform hover:scale-105 transition-transform ${getBinColor(bin)}`}>
+                             <span>{bin.toLowerCase().includes('plastic') ? '🔵' : bin.toLowerCase().includes('coconut') ? '🥥' : bin.toLowerCase().includes('paper') || bin.toLowerCase().includes('cloth') ? '📄' : '🌸'}</span>
+                             {bin}
+                           </div>
+                        ))}
+                      </div>
+                    </div>
+                )}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-stone-400 opacity-50">

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { MOCK_UPDATES, BowArrowLogo } from '../constants';
+import { HinduTempleLogo } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { FlashUpdate } from '../types';
@@ -127,11 +127,11 @@ const Home = () => {
         </div>
 
         <div className="relative z-10 max-w-5xl px-4 flex flex-col items-center">
-          <div className="mb-8 animate-float">
+          <div className="mb-8 animate-gentle-float"> {/* Slowed down animation here */}
             <div className="relative">
               <div className="absolute inset-0 bg-orange-500 blur-3xl opacity-40 rounded-full animate-pulse-glow"></div>
               <div className="p-6 bg-white/10 backdrop-blur-xl rounded-full border border-white/20 shadow-2xl relative">
-                <BowArrowLogo className="w-20 h-20 md:w-28 md:h-28 rounded-full shadow-inner bg-gradient-to-br from-orange-500 to-red-600 p-5 text-white" color="white" />
+                <HinduTempleLogo className="w-20 h-20 md:w-28 md:h-28 rounded-full shadow-inner bg-gradient-to-br from-orange-500 to-red-600 p-5 text-white" color="white" />
               </div>
             </div>
           </div>

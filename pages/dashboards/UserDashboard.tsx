@@ -1,432 +1,684 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { User, Order, Notification, FlashUpdate } from '../../types';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { User, PickupRequest, VolunteerRequest, VolunteerDuty } from '../../types';
+import DashboardLayout from '../../components/DashboardLayout';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
-interface DashboardProps {
-  onLogout?: () => void;
-}
+interface DashboardProps { onLogout?: () => void; }
 
 const UserDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [profile, setProfile] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'SUBMIT' | 'WALLET' | 'ORDERS' | 'NOTIFICATIONS' | 'PROFILE'>('DASHBOARD');
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  
-  // Submit Waste
-  const [wasteInput, setWasteInput] = useState({ type: 'Flower Waste', amount: '', photo: null as string | null });
-  
-  // Data
-  const [history, setHistory] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [activeTab, setActiveTab] = useState('DASHBOARD');
+  const [wasteInput, setWasteInput] = useState({ type: 'Flower Waste', amount: '', photo: null as string | null, address: '' });
   const [chartData, setChartData] = useState<any[]>([]);
-  const [adminUpdates, setAdminUpdates] = useState<FlashUpdate[]>([]);
+  const [pickups, setPickups] = useState<PickupRequest[]>([]);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState<any>({});
+  const [reportRange, setReportRange] = useState({ start: '', end: '' });
+  
+  // Rating State
+  const [ratingModal, setRatingModal] = useState<{ isOpen: boolean, ngoId: string } | null>(null);
+  const [ratingInput, setRatingInput] = useState({ rating: 5, reason: '' });
+  const [profileRatingInput, setProfileRatingInput] = useState({ rating: 5, reason: '' });
 
-  useEffect(() => {
-    fetchProfile();
-    fetchUpdates();
-  }, []);
+  // Volunteer State
+  const [volunteerStatus, setVolunteerStatus] = useState<'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'>('NONE');
+  const [volunteerForm, setVolunteerForm] = useState({
+    fullName: '',
+    contact: '',
+    taluk: '',
+    district: '',
+    state: '',
+    idProof: null as string | null,
+    notes: ''
+  });
+  const [showVolunteerForm, setShowVolunteerForm] = useState(false);
+  
+  // New: Duties State
+  const [duties, setDuties] = useState<VolunteerDuty[]>([]);
+  const [assignedDuDetails, setAssignedDuDetails] = useState<any>(null);
 
-  useEffect(() => {
-    if (profile) {
-      fetchHistory();
-      fetchOrders();
-      fetchNotifications();
-    }
+  useEffect(() => { fetchProfile(); }, []);
+  
+  useEffect(() => { 
+    if (profile) { 
+        fetchHistory(); 
+        fetchVolunteerStatus();
+        setProfileForm({ full_name: profile.name, address: profile.address || '', imageUrl: profile.imageUrl }); 
+        setWasteInput(prev => ({...prev, address: profile.address || ''}));
+        setVolunteerForm(prev => ({...prev, fullName: profile.name, contact: profile.contact || ''}));
+    } 
   }, [profile]);
+
+  // Force refresh when tab changes to dashboard to update Green Coins
+  useEffect(() => {
+      if (activeTab === 'DASHBOARD') {
+          fetchProfile();
+      }
+      if (activeTab === 'VOLUNTEER_DUTIES' && profile) {
+          fetchDuties();
+          fetchAssignedDu();
+      }
+  }, [activeTab]);
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      setProfile(data);
+      // Explicitly map snake_case to camelCase where needed
+      setProfile({ 
+          ...data, 
+          name: data.full_name || 'User', 
+          role: 'PERSON', 
+          imageUrl: data.image_url,
+          greenCoins: data.green_coins || 0,
+          wasteDonatedKg: data.waste_donated_kg || 0
+      });
     }
   };
-
   const fetchHistory = async () => {
     if(!profile) return;
-    const { data } = await supabase.from('waste_logs').select('*').eq('user_id', profile.id);
+    const { data } = await supabase.from('pickup_requests').select('*').eq('requester_id', profile.id);
     if(data) {
-        setHistory(data.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-        const agg: {[key:string]: number} = {};
-        data.forEach((item: any) => {
-          if (item.status === 'VERIFIED') {
-             agg[item.waste_type] = (agg[item.waste_type] || 0) + item.amount_kg;
-          }
+        // Sort client-side
+        const sortedData = data.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setPickups(sortedData);
+        
+        const agg: any = {};
+        sortedData.forEach((i: any) => { 
+            if (i.status === 'COMPLETED') {
+               agg[i.waste_type] = (agg[i.waste_type] || 0) + i.estimated_weight; 
+            }
         });
         setChartData(Object.keys(agg).map(k => ({ name: k, value: agg[k] })));
     }
   };
 
-  const fetchOrders = async () => {
-    if(!profile) return;
-    const { data } = await supabase.from('orders').select('*').eq('user_id', profile.id);
-    if(data) setOrders(data);
+  const fetchVolunteerStatus = async () => {
+      if(!profile) return;
+      const { data } = await supabase.from('volunteer_requests').select('status').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(1);
+      
+      if (data && data.length > 0) {
+          setVolunteerStatus(data[0].status);
+      } else {
+          setVolunteerStatus('NONE');
+      }
   };
 
-  const fetchNotifications = async () => {
-    if(!profile) return;
-    const { data } = await supabase.from('notifications').select('*').eq('user_id', profile.id);
-    if(data) setNotifications(data);
-  };
+  const fetchDuties = async () => {
+      if(!profile) return;
+      const { data } = await supabase.from('volunteer_duties').select('*').eq('volunteer_id', profile.id);
+      if(data) {
+          const sorted = data.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          setDuties(sorted);
+      }
+  }
 
-  const fetchUpdates = async () => {
-    const { data } = await supabase.from('flash_updates').select('*').order('created_at', { ascending: false });
-    if (data) {
-      const relevant = data.filter(d => d.type !== 'VIDEO_CONFIG' && (d.audience === 'USER' || d.audience === 'ALL'));
-      setAdminUpdates(relevant.slice(0, 3));
-    }
-  };
+  const fetchAssignedDu = async () => {
+      if(!profile || !profile.assignedDuId) return;
+      const { data } = await supabase.from('profiles').select('full_name, email, contact').eq('id', profile.assignedDuId).single();
+      if(data) setAssignedDuDetails(data);
+  }
+
+  const handleUpdateDutyStatus = async (dutyId: string, newStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED') => {
+      await supabase.from('volunteer_duties').update({ status: newStatus }).eq('id', dutyId);
+      fetchDuties();
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => setWasteInput(prev => ({ ...prev, photo: reader.result as string }));
+        reader.readAsDataURL(file);
+      }
+  };
+
+  const handleVolunteerFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setWasteInput(prev => ({ ...prev, photo: reader.result as string }));
+      reader.onloadend = () => setVolunteerForm(prev => ({ ...prev, idProof: reader.result as string }));
       reader.readAsDataURL(file);
     }
   };
 
   const handleSubmitWaste = async () => {
-    if (!profile || !wasteInput.amount || !wasteInput.photo) {
-        alert("Please provide amount and photo proof for admin verification.");
-        return;
-    }
-    const amount = parseFloat(wasteInput.amount);
-    
-    // Log entry - KEY FIX: Submits to waste_logs with PENDING_VERIFICATION status
-    // This allows admin to see it in the verification tab
-    await supabase.from('waste_logs').insert([{
-        user_id: profile.id,
-        amount_kg: amount,
-        waste_type: wasteInput.type,
-        status: 'PENDING_VERIFICATION', // Waiting for Admin Approval
-        image_url: wasteInput.photo,
-        created_at: new Date().toISOString()
-    }]);
-
-    // Send notification to user that it is pending
-    await supabase.from('notifications').insert([{
-        user_id: profile.id,
-        title: 'Waste Submitted',
-        message: `Your contribution of ${amount}kg ${wasteInput.type} is pending verification.`,
-        type: 'UPDATE',
-        read: false
-    }]);
-
-    alert("Waste submitted successfully! Green coins will be credited after Admin verification.");
-    setWasteInput({ type: 'Flower Waste', amount: '', photo: null });
-    fetchHistory();
+      if (!profile || !wasteInput.amount) return alert("Please enter weight.");
+      if (!wasteInput.address) return alert("Please confirm your pickup address.");
+      if (!wasteInput.photo) return alert("Please upload a photo for proof.");
+      
+      const ngoId = profile.assignedNgoId || 'ngo1'; 
+      
+      await supabase.from('pickup_requests').insert([{ 
+          requester_id: profile.id, 
+          requester_type: 'USER',
+          ngo_id: ngoId, 
+          status: 'PENDING',
+          estimated_weight: parseFloat(wasteInput.amount), 
+          waste_type: wasteInput.type, 
+          address: wasteInput.address,
+          scheduled_date: new Date().toISOString().split('T')[0],
+          time_slot: '09:00 AM',
+          image_url: wasteInput.photo, 
+          created_at: new Date().toISOString()
+      }]);
+      alert("Pickup Request Sent! NGO will review, assign a driver, and you will be notified."); 
+      setWasteInput({ type: 'Flower Waste', amount: '', photo: null, address: profile.address || '' });
+      setActiveTab('HISTORY');
+      fetchHistory();
   };
 
-  const handleRedeemCoupon = async () => {
-      if(!profile || !profile.greenCoins || profile.greenCoins < 100) {
-          alert("Insufficient Balance. You need at least 100 Green Coins.");
+  const handleSubmitVolunteer = async () => {
+      if(!profile) return;
+      if (!volunteerForm.fullName || !volunteerForm.contact || !volunteerForm.taluk || !volunteerForm.district || !volunteerForm.state || !volunteerForm.idProof) {
+          alert("Please fill all required fields and upload ID proof.");
           return;
       }
-      const confirm = window.confirm("Redeem 100 coins for a 20% discount coupon?");
-      if(confirm) {
-          await supabase.from('profiles').update({ green_coins: profile.greenCoins - 100 }).eq('id', profile.id);
-          alert("Coupon Code: TEMPLE20 - Sent to your email!");
-          fetchProfile();
-      }
+
+      await supabase.from('volunteer_requests').insert([{
+          user_id: profile.id,
+          full_name: volunteerForm.fullName,
+          contact: volunteerForm.contact,
+          taluk: volunteerForm.taluk,
+          district: volunteerForm.district,
+          state: volunteerForm.state,
+          id_proof_url: volunteerForm.idProof,
+          notes: volunteerForm.notes,
+          status: 'PENDING',
+          created_at: new Date().toISOString()
+      }]);
+
+      await supabase.from('profiles').update({ volunteer_status: 'PENDING' }).eq('id', profile.id);
+
+      alert("Volunteer Request Submitted! Status: Pending Verification.");
+      setVolunteerStatus('PENDING');
+      setShowVolunteerForm(false);
   };
 
-  const handleUpdateProfile = async (updates: any) => {
+  const handleUpdateProfile = async () => {
       if(!profile) return;
-      const { error } = await supabase.from('profiles').update(updates).eq('id', profile.id);
-      if(!error) {
-          setProfile({...profile, ...updates});
-          alert("Profile updated.");
+      await supabase.from('profiles').update({ full_name: profileForm.full_name, address: profileForm.address, image_url: profileForm.imageUrl }).eq('id', profile.id);
+      setIsEditingProfile(false);
+      fetchProfile();
+  }
+
+  const handleMarkLoaded = async (id: string) => {
+      const { error } = await supabase.from('pickup_requests').update({ status: 'LOADED' }).eq('id', id);
+      if (error) {
+          alert("Error updating status. Please try again.");
+      } else {
+          fetchHistory();
+          alert("Status updated to Loaded! Waiting for NGO final confirmation.");
       }
+  }
+
+  const openRatingModal = (ngoId: string) => {
+      setRatingModal({ isOpen: true, ngoId });
   };
 
-  const COLORS = ['#ea580c', '#16a34a', '#2563eb', '#9333ea', '#db2777'];
+  const handleSubmitRating = async () => {
+      if(!profile || !ratingModal) return;
+      await supabase.from('ratings').insert([{
+          from_id: profile.id,
+          to_id: ratingModal.ngoId,
+          rating: ratingInput.rating,
+          reason: ratingInput.reason,
+          created_at: new Date().toISOString()
+      }]);
+      alert("Feedback submitted successfully!");
+      setRatingModal(null);
+      setRatingInput({ rating: 5, reason: '' });
+  };
+
+  const handleRateAssignedNgo = async () => {
+      if(!profile || !profile.assignedNgoId) return alert("No NGO assigned.");
+      await supabase.from('ratings').insert([{
+          from_id: profile.id,
+          to_id: profile.assignedNgoId,
+          rating: profileRatingInput.rating,
+          reason: profileRatingInput.reason,
+          created_at: new Date().toISOString()
+      }]);
+      alert("Profile Feedback sent!");
+      setProfileRatingInput({ rating: 5, reason: '' });
+  };
+
+  const handleDownloadReport = () => {
+      const filtered = pickups.filter(p => {
+          if (!reportRange.start || !reportRange.end) return true;
+          const d = new Date(p.scheduled_date);
+          return d >= new Date(reportRange.start) && d <= new Date(reportRange.end);
+      });
+
+      const csv = "Date,Type,Weight(kg),Status,Driver\n" + 
+          filtered.map(p => `${p.scheduled_date},${p.waste_type},${p.estimated_weight},${p.status},${p.driver_name || '-'}`).join("\n");
+      
+      const link = document.createElement("a");
+      link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
+      link.download = "my_waste_report.csv";
+      link.click();
+  }
+
+  const initiateLogout = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const sidebarItems = [
+      { id: 'DASHBOARD', label: 'Home', icon: '🏠' },
+      { id: 'SUBMIT', label: 'Schedule Pickup', icon: '♻️' },
+      { id: 'VOLUNTEERS', label: 'Volunteers', icon: '🙌' },
+      { id: 'HISTORY', label: 'History & Status', icon: '📜' },
+      { id: 'REPORTS', label: 'Reports', icon: '📈' },
+      { id: 'PROFILE', label: 'Profile', icon: '👤' },
+      { id: 'SETTINGS', label: 'Settings', icon: '⚙️' },
+  ];
   
-  // Calculate badges
-  const getBadges = () => {
-     const totalWaste = history.filter(h => h.status === 'VERIFIED').reduce((acc, curr) => acc + curr.amount_kg, 0);
-     const badges = [];
-     if(totalWaste > 10) badges.push("Eco Warrior");
-     if(totalWaste > 50) badges.push("Top Saver");
-     if(history.length > 5) badges.push("Consistent Contributor");
-     return badges;
-  };
+  if (volunteerStatus === 'APPROVED') {
+      sidebarItems.splice(2, 0, { id: 'VOLUNTEER_DUTIES', label: 'Volunteer Duties', icon: '📋' });
+  }
 
-  const calculateCarbon = () => {
-      const totalWaste = history.filter(h => h.status === 'VERIFIED').reduce((acc, curr) => acc + curr.amount_kg, 0);
-      return (totalWaste * 0.5).toFixed(2);
-  };
+  const COLORS = ['#f97316', '#22c55e', '#3b82f6', '#a855f7'];
 
-  if (!profile) return <div className="p-10 text-center">Loading Profile...</div>;
+  if (!profile) return <div className="p-20 text-center">Loading Profile...</div>;
 
   return (
-    <div className="min-h-screen bg-stone-50 p-6 relative">
-      <div className="max-w-5xl mx-auto">
-        <header className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200 mb-8 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center text-2xl relative">
-                   👤
-                   {notifications.filter(n => !n.read).length > 0 && (
-                       <span className="absolute top-0 right-0 w-4 h-4 bg-red-600 rounded-full border-2 border-white"></span>
-                   )}
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-stone-800">{profile.name}</h1>
-                    <p className="text-sm text-stone-500">Green Coins: <span className="text-green-600 font-bold">{profile.greenCoins || 0}</span></p>
-                </div>
-            </div>
-            <button onClick={() => setShowLogoutConfirm(true)} className="text-red-600 font-bold text-sm hover:underline">Logout</button>
-        </header>
-
-        <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
-            {['DASHBOARD', 'SUBMIT', 'WALLET', 'ORDERS', 'NOTIFICATIONS', 'PROFILE'].map(tab => (
-                <button 
-                  key={tab} 
-                  onClick={() => setActiveTab(tab as any)}
-                  className={`px-4 py-2 font-bold text-sm rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-stone-800 text-white' : 'bg-white text-stone-600 border border-stone-200'}`}
-                >
-                    {tab}
-                </button>
-            ))}
-        </div>
-
-        {activeTab === 'DASHBOARD' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in-up">
-                
-                {/* Announcements Section */}
-                <div className="md:col-span-2 bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
-                     <h3 className="font-bold text-stone-800 flex items-center gap-2 mb-3">📢 Community Announcements</h3>
-                     {adminUpdates.length > 0 ? (
-                        <div className="grid gap-3 md:grid-cols-3">
-                            {adminUpdates.map(u => (
-                                <div key={u.id} className="bg-white p-3 rounded-lg shadow-sm border border-stone-100">
-                                     <p className={`text-xs font-bold ${u.type === 'ALERT' ? 'text-red-600' : 'text-green-600'} mb-1`}>{u.title}</p>
-                                     <p className="text-xs text-stone-600 leading-snug">{u.content}</p>
-                                </div>
-                            ))}
-                        </div>
-                     ) : (
-                        <p className="text-sm text-stone-500 italic">No new announcements from admin.</p>
-                     )}
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
-                    <h2 className="font-bold text-lg mb-4">My Impact</h2>
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                        <div className="p-4 bg-green-50 rounded-lg">
-                            <p className="text-2xl font-bold text-green-700">{calculateCarbon()} kg</p>
-                            <p className="text-xs text-green-800 uppercase">CO2 Prevented</p>
-                        </div>
-                        <div className="p-4 bg-orange-50 rounded-lg">
-                            <p className="text-2xl font-bold text-orange-700">{history.length}</p>
-                            <p className="text-xs text-orange-800 uppercase">Contributions</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
-                    <h2 className="font-bold text-lg mb-4">Badges Earned</h2>
-                    <div className="flex flex-wrap gap-2">
-                        {getBadges().map(b => (
-                            <span key={b} className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-bold border border-yellow-200">🏆 {b}</span>
-                        ))}
-                        {getBadges().length === 0 && <p className="text-stone-400 text-sm">Contribute more verified waste to earn badges!</p>}
-                    </div>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 md:col-span-2">
-                     <h2 className="font-bold text-lg mb-4">Contribution Mix (Verified)</h2>
-                     <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={chartData} dataKey="value" cx="50%" cy="50%" outerRadius={80} fill="#8884d8">
-                                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                </Pie>
-                                <Legend />
-                                <RechartsTooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
-                     </div>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'SUBMIT' && (
-            <div className="bg-white p-8 rounded-xl shadow-sm border border-stone-200 max-w-xl mx-auto animate-fade-in-up">
-                <h2 className="font-bold text-xl mb-6">Submit Daily Waste</h2>
-                <div className="bg-blue-50 p-4 rounded-lg mb-6 text-sm text-blue-800 border border-blue-100">
-                   <strong>Note:</strong> Your submission will be reviewed by the admin. Once approved, coins will be added to your wallet.
-                </div>
-                <div className="space-y-4">
-                    <select 
-                      className="w-full border p-3 rounded-lg bg-stone-50"
-                      value={wasteInput.type}
-                      onChange={e => setWasteInput({...wasteInput, type: e.target.value})}
-                    >
-                        <option>Flower Waste</option>
-                        <option>Organic/Food</option>
-                        <option>Recyclable Plastic</option>
-                        <option>Coconut Shells</option>
-                    </select>
-                    <input 
-                      type="number" 
-                      placeholder="Weight (Kg)" 
-                      className="w-full border p-3 rounded-lg"
-                      value={wasteInput.amount}
-                      onChange={e => setWasteInput({...wasteInput, amount: e.target.value})}
-                    />
-                    <div>
-                        <p className="text-xs font-bold mb-1 text-stone-500">Photo Verification (Required)</p>
-                        <input type="file" onChange={handleFileSelect} className="w-full border p-2 rounded-lg" accept="image/*" />
-                        {wasteInput.photo && <img src={wasteInput.photo} className="mt-2 h-32 rounded object-cover" />}
-                    </div>
-                    <button onClick={handleSubmitWaste} className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors">
-                        Submit for Verification
-                    </button>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'WALLET' && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 animate-fade-in-up">
-                <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-8 rounded-xl text-white mb-6 text-center shadow-lg">
-                    <p className="text-sm opacity-90 uppercase tracking-widest">Available Balance</p>
-                    <p className="text-5xl font-bold mt-2">{profile.greenCoins || 0}</p>
-                    <p className="text-sm mt-1">Green Coins</p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                     <button onClick={() => alert("Redirecting to Eco-Shop...")} className="bg-stone-800 text-white p-4 rounded-xl font-bold hover:bg-stone-900 transition-colors text-center">
-                        🛍️ Redeem Products
-                     </button>
-                     <button onClick={handleRedeemCoupon} className="bg-white border-2 border-orange-500 text-orange-600 p-4 rounded-xl font-bold hover:bg-orange-50 transition-colors text-center">
-                        🎟️ Get Discount Coupon (100 Coins)
-                     </button>
-                </div>
-                
-                <h3 className="font-bold text-lg mb-4">Transaction History</h3>
-                <div className="space-y-2">
-                    {history.map(h => (
-                        <div key={h.id} className="flex justify-between p-3 bg-stone-50 rounded border border-stone-100 items-center">
-                            <div>
-                                <p className="font-bold text-sm text-stone-700">Waste Deposit: {h.waste_type}</p>
-                                <p className="text-xs text-stone-400">{new Date(h.created_at).toLocaleDateString()}</p>
-                            </div>
-                            <div className="text-right">
-                                {h.status === 'VERIFIED' ? (
-                                    <span className="text-green-600 font-bold">+{h.amount_kg * 10}</span>
-                                ) : h.status === 'REJECTED' ? (
-                                    <span className="text-red-500 font-bold text-xs">Rejected</span>
-                                ) : (
-                                    <span className="text-yellow-600 font-bold text-xs bg-yellow-100 px-2 py-1 rounded">Pending</span>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                    {history.length === 0 && <p className="text-stone-400 text-center">No transactions yet.</p>}
-                </div>
-            </div>
-        )}
-        
-        {activeTab === 'ORDERS' && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 animate-fade-in-up">
-                <h2 className="font-bold text-lg mb-4">Order Tracking</h2>
-                <div className="space-y-4">
-                    {orders.map(order => (
-                        <div key={order.id} className="border border-stone-100 rounded-lg p-4 bg-stone-50">
-                            <div className="flex justify-between items-start mb-2">
-                                <div>
-                                    <h4 className="font-bold text-stone-800">{order.product_name}</h4>
-                                    <p className="text-xs text-stone-500">Ordered: {new Date(order.ordered_at).toLocaleDateString()}</p>
-                                    <p className="text-xs text-stone-400 font-mono">ID: {order.tracking_id || 'Generating...'}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="font-bold text-orange-600">-{order.coins_spent} Coins</p>
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase mt-1 inline-block ${
-                                        order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 
-                                        order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
-                                    }`}>
-                                        {order.status}
-                                    </span>
-                                </div>
-                            </div>
-                            {/* Simple Progress Bar */}
-                            <div className="h-1 w-full bg-stone-200 rounded-full mt-2 overflow-hidden">
-                                <div 
-                                    className={`h-full ${order.status === 'DELIVERED' ? 'bg-green-500 w-full' : order.status === 'SHIPPED' ? 'bg-blue-500 w-2/3' : 'bg-yellow-500 w-1/3'}`}
-                                ></div>
-                            </div>
-                        </div>
-                    ))}
-                    {orders.length === 0 && <p className="text-center text-stone-400 py-10">You haven't redeemed any products yet.</p>}
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'NOTIFICATIONS' && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 max-w-2xl mx-auto animate-fade-in-up">
-                <h2 className="font-bold text-lg mb-4">Notification Center</h2>
-                <div className="space-y-4">
-                    {notifications.map(n => (
-                        <div key={n.id} className={`p-4 rounded-lg border ${n.read ? 'bg-white border-stone-100' : 'bg-blue-50 border-blue-100'}`}>
-                            <div className="flex justify-between items-start">
-                                <h4 className="font-bold text-stone-800 text-sm">{n.title}</h4>
-                                <span className="text-[10px] text-stone-400">{new Date(n.created_at).toLocaleDateString()}</span>
-                            </div>
-                            <p className="text-stone-600 text-sm mt-1">{n.message}</p>
-                        </div>
-                    ))}
-                    {notifications.length === 0 && <p className="text-stone-400 text-center py-10">No notifications.</p>}
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'PROFILE' && (
-            <div className="max-w-xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-stone-200 space-y-4 animate-fade-in-up">
-                <h2 className="font-bold text-xl mb-4">Edit Profile</h2>
-                <div>
-                   <label className="block text-xs font-bold text-stone-400 uppercase">Full Name</label>
-                   <input className="w-full border p-2 rounded" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} />
-                </div>
-                <div>
-                   <label className="block text-xs font-bold text-stone-400 uppercase">Delivery Address</label>
-                   <input className="w-full border p-2 rounded" value={profile.address || ''} onChange={e => setProfile({...profile, address: e.target.value})} placeholder="Enter address for product delivery" />
-                </div>
-                <div>
-                   <label className="block text-xs font-bold text-stone-400 uppercase">Contact Number</label>
-                   <input className="w-full border p-2 rounded" value={profile.contact || ''} onChange={e => setProfile({...profile, contact: e.target.value})} />
-                </div>
-                <button onClick={() => handleUpdateProfile({ name: profile.name, address: profile.address, contact: profile.contact })} className="w-full bg-stone-800 text-white py-2 rounded font-bold">Save Details</button>
-            </div>
-        )}
-
-        {/* Logout Confirmation Modal */}
-        {showLogoutConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm border border-stone-200 animate-fade-in-up">
-              <h3 className="text-lg font-bold text-stone-800 mb-2">Confirm Logout</h3>
-              <p className="text-stone-600 mb-6">Are you sure you want to end your session?</p>
-              <div className="flex justify-end gap-3">
-                <button 
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="px-4 py-2 text-stone-600 font-bold hover:bg-stone-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={() => { setShowLogoutConfirm(false); onLogout && onLogout(); }}
-                  className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-md"
-                >
-                  Logout
-                </button>
+    <>
+      <DashboardLayout 
+        title="Personal Dashboard" 
+        user={profile}
+        sidebarItems={sidebarItems} 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onLogout={initiateLogout}
+      >
+          {activeTab === 'DASHBOARD' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="glass-card p-8 rounded-3xl bg-gradient-to-br from-green-400 to-emerald-600 text-white shadow-lg shadow-green-500/20">
+                      <p className="text-green-100 text-xs font-bold uppercase">Carbon Saved</p>
+                      <p className="text-5xl font-bold mt-2">{(chartData.reduce((acc, c) => acc + c.value, 0) * 0.5).toFixed(1)} kg</p>
+                      <p className="text-xs text-green-100 mt-2 font-semibold">
+                          Based on {chartData.reduce((acc, c) => acc + c.value, 0)} kg waste recycled
+                      </p>
+                  </div>
+                  <div className="glass-card p-8 rounded-3xl bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg shadow-orange-500/20">
+                      <p className="text-yellow-100 text-xs font-bold uppercase">Green Coins</p>
+                      <p className="text-5xl font-bold mt-2">{profile.greenCoins}</p>
+                      <p className="text-xs text-orange-100 mt-2">Earned from confirmed pickups</p>
+                  </div>
+                  <div className="glass-panel p-6 rounded-3xl md:col-span-2 h-72 flex items-center relative">
+                      <div className="w-full h-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                  <Pie data={chartData} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5}>
+                                      {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                  </Pie>
+                                  <Tooltip />
+                                  <Legend verticalAlign="middle" align="right" />
+                              </PieChart>
+                          </ResponsiveContainer>
+                      </div>
+                      {chartData.length === 0 && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-stone-400">
+                              <span className="text-4xl mb-2">📊</span>
+                              <span>No contribution data yet.</span>
+                          </div>
+                      )}
+                  </div>
               </div>
+          )}
+
+          {activeTab === 'SUBMIT' && (
+              <div className="glass-panel max-w-lg mx-auto p-8 rounded-3xl bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+                  <h3 className="font-bold text-slate-800 text-xl mb-6">Schedule Waste Pickup</h3>
+                  <div className="space-y-4">
+                      <select className="w-full p-3 rounded-xl bg-white border border-slate-200" value={wasteInput.type} onChange={e => setWasteInput({...wasteInput, type: e.target.value})}>
+                          <option>Flower Waste</option>
+                          <option>Plastic</option>
+                          <option>Coconut Shells</option>
+                          <option>Paper / Books</option>
+                          <option>Religious Cloth</option>
+                          <option>Other Organic</option>
+                      </select>
+                      <input type="number" placeholder="Est. Weight (kg)" className="w-full p-3 rounded-xl bg-white border border-slate-200" value={wasteInput.amount} onChange={e => setWasteInput({...wasteInput, amount: e.target.value})} />
+                      
+                      {/* Explicit Address Confirmation */}
+                      <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Confirm Pickup Address</label>
+                        <input type="text" placeholder="Enter full address" className="w-full p-2 rounded-lg bg-white border border-slate-300 text-sm" value={wasteInput.address} onChange={e => setWasteInput({...wasteInput, address: e.target.value})} />
+                      </div>
+
+                      {/* Photo Upload */}
+                      <div className="border border-dashed border-slate-300 p-4 rounded-xl text-center cursor-pointer bg-slate-50">
+                          <input type="file" onChange={handleFileSelect} className="hidden" id="waste-pic-user" />
+                          <label htmlFor="waste-pic-user" className="cursor-pointer text-sm text-slate-500 flex flex-col items-center gap-2">
+                              {wasteInput.photo ? <img src={wasteInput.photo} className="h-24 w-24 object-cover rounded-lg" /> : <span>📸 Upload Proof (Mandatory)</span>}
+                          </label>
+                      </div>
+                      
+                      <button onClick={handleSubmitWaste} className="w-full py-3 bg-green-500 text-white font-bold rounded-xl shadow-lg hover:bg-green-600 transition-colors">Request NGO Pickup</button>
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'VOLUNTEERS' && (
+              <div className="glass-panel p-8 rounded-3xl max-w-2xl mx-auto">
+                  <h3 className="font-bold text-slate-800 text-2xl mb-6">Community Volunteering</h3>
+                  
+                  {volunteerStatus === 'APPROVED' && (
+                      <div className="bg-green-100 p-6 rounded-2xl border border-green-200 text-center mb-6">
+                          <div className="text-6xl mb-4">🎖️</div>
+                          <h4 className="text-xl font-bold text-green-800">You are an Active Volunteer</h4>
+                          <p className="text-green-700 mt-2">Thank you for your service! Check 'Volunteer Duties' tab for tasks.</p>
+                      </div>
+                  )}
+
+                  {volunteerStatus === 'PENDING' && (
+                      <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-200 text-center mb-6">
+                          <div className="text-6xl mb-4">⏳</div>
+                          <h4 className="text-xl font-bold text-yellow-800">Verification Pending</h4>
+                          <p className="text-yellow-700 mt-2">Your application is being reviewed by the Admin team.</p>
+                      </div>
+                  )}
+
+                  {volunteerStatus === 'REJECTED' && (
+                      <div className="bg-red-50 p-6 rounded-2xl border border-red-200 text-center mb-6">
+                          <h4 className="text-xl font-bold text-red-800">Application Rejected</h4>
+                          <p className="text-red-700 mt-2">Please contact support or try applying again later.</p>
+                          <button onClick={() => setVolunteerStatus('NONE')} className="mt-4 text-xs font-bold underline text-red-600">Apply Again</button>
+                      </div>
+                  )}
+
+                  {volunteerStatus === 'NONE' && !showVolunteerForm && (
+                      <div className="text-center py-10">
+                          <p className="text-lg text-slate-600 mb-6">Are you interested in volunteering and helping as a community volunteer?</p>
+                          <button 
+                            onClick={() => setShowVolunteerForm(true)}
+                            className="bg-orange-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-orange-700 transition-transform hover:scale-105"
+                          >
+                            YES, I want to help! 🙋
+                          </button>
+                      </div>
+                  )}
+
+                  {volunteerStatus === 'NONE' && showVolunteerForm && (
+                      <div className="space-y-4 animate-fade-in">
+                          <p className="text-sm text-slate-500 mb-2">Please provide your details for verification.</p>
+                          
+                          <input className="w-full p-3 rounded-xl border" placeholder="Full Name" value={volunteerForm.fullName} onChange={e => setVolunteerForm({...volunteerForm, fullName: e.target.value})} />
+                          <input className="w-full p-3 rounded-xl border" placeholder="Contact Number" value={volunteerForm.contact} onChange={e => setVolunteerForm({...volunteerForm, contact: e.target.value})} />
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                              <input className="p-3 rounded-xl border" placeholder="Taluk" value={volunteerForm.taluk} onChange={e => setVolunteerForm({...volunteerForm, taluk: e.target.value})} />
+                              <input className="p-3 rounded-xl border" placeholder="District" value={volunteerForm.district} onChange={e => setVolunteerForm({...volunteerForm, district: e.target.value})} />
+                          </div>
+                          <input className="w-full p-3 rounded-xl border" placeholder="State" value={volunteerForm.state} onChange={e => setVolunteerForm({...volunteerForm, state: e.target.value})} />
+                          
+                          <textarea className="w-full p-3 rounded-xl border h-20" placeholder="Additional Notes (Optional)" value={volunteerForm.notes} onChange={e => setVolunteerForm({...volunteerForm, notes: e.target.value})}></textarea>
+
+                          <div className="border border-dashed border-slate-300 p-4 rounded-xl text-center cursor-pointer bg-slate-50">
+                              <input type="file" onChange={handleVolunteerFileSelect} className="hidden" id="vol-id-proof" />
+                              <label htmlFor="vol-id-proof" className="cursor-pointer text-sm text-slate-500 flex flex-col items-center gap-2">
+                                  {volunteerForm.idProof ? <img src={volunteerForm.idProof} className="h-24 w-full object-contain rounded-lg" /> : <span>🆔 Upload ID Proof (Required)</span>}
+                              </label>
+                          </div>
+
+                          <div className="flex gap-4 pt-4">
+                              <button onClick={() => setShowVolunteerForm(false)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold">Cancel</button>
+                              <button onClick={handleSubmitVolunteer} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg">Submit Request</button>
+                          </div>
+                      </div>
+                  )}
+              </div>
+          )}
+
+          {activeTab === 'VOLUNTEER_DUTIES' && (
+              <div className="glass-panel p-6 rounded-3xl">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-bold text-slate-800 text-xl">Volunteer Dashboard</h3>
+                      <div className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                          <span>🎖️</span> Official Volunteer
+                      </div>
+                  </div>
+
+                  {/* DU Assignment Status */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 mb-8 flex items-center justify-between">
+                      <div>
+                          <p className="text-xs text-stone-400 uppercase font-bold tracking-wider">Assigned Drying Unit</p>
+                          {assignedDuDetails ? (
+                              <>
+                                  <h2 className="text-2xl font-bold text-slate-800 mt-1">{assignedDuDetails.full_name}</h2>
+                                  <p className="text-sm text-stone-600 mt-1">Status: <span className="text-green-600 font-bold">Accepted & Active</span></p>
+                                  <p className="text-xs text-stone-500 mt-1">📞 {assignedDuDetails.contact}</p>
+                              </>
+                          ) : (
+                              <p className="text-stone-500 mt-1 italic">Waiting for Drying Unit Acceptance...</p>
+                          )}
+                      </div>
+                      <div className="text-4xl">🏢</div>
+                  </div>
+
+                  <h4 className="font-bold text-slate-700 mb-4 text-lg">Assigned Duties</h4>
+                  <div className="space-y-4">
+                      {duties.map(duty => (
+                          <div key={duty.id} className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
+                              <div className={`absolute top-0 left-0 w-1.5 h-full ${
+                                  duty.status === 'COMPLETED' ? 'bg-green-500' : duty.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-orange-500'
+                              }`}></div>
+                              
+                              <div className="flex justify-between items-start pl-3">
+                                  <div className="flex-1">
+                                      <h5 className="font-bold text-slate-800 text-lg">{duty.title}</h5>
+                                      <p className="text-stone-600 text-sm mt-1">{duty.description}</p>
+                                      <p className="text-xs text-stone-400 mt-3 flex items-center gap-1">
+                                          <span>📅</span> Assigned: {new Date(duty.created_at).toLocaleString()}
+                                      </p>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-2">
+                                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                                          duty.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : duty.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                                      }`}>
+                                          {duty.status.replace('_', ' ')}
+                                      </span>
+                                      
+                                      {duty.status !== 'COMPLETED' && (
+                                          <div className="flex gap-2 mt-2">
+                                              {duty.status === 'PENDING' && (
+                                                  <button onClick={() => handleUpdateDutyStatus(duty.id, 'IN_PROGRESS')} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 font-bold transition-colors">Start Duty</button>
+                                              )}
+                                              {duty.status === 'IN_PROGRESS' && (
+                                                  <button onClick={() => handleUpdateDutyStatus(duty.id, 'COMPLETED')} className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-green-700 font-bold transition-colors">Mark Complete</button>
+                                              )}
+                                          </div>
+                                      )}
+                                  </div>
+                              </div>
+                          </div>
+                      ))}
+                      {duties.length === 0 && (
+                          <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                              <p className="text-stone-400">No duties assigned yet.</p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'HISTORY' && (
+              <div className="glass-panel p-6 rounded-3xl max-w-3xl mx-auto">
+                  <h3 className="font-bold text-slate-800 mb-6">Request History</h3>
+                  <div className="space-y-3">
+                      {pickups.map((p, idx) => (
+                          <div key={idx} className={`p-4 rounded-xl border ${p.status === 'REJECTED' ? 'bg-red-50 border-red-200' : 'bg-white/60 border-stone-200'}`}>
+                              <div className="flex justify-between items-start">
+                                  <div>
+                                      <p className="font-bold text-slate-700">{p.waste_type} ({p.estimated_weight} kg)</p>
+                                      <p className="text-xs text-slate-500">{p.scheduled_date}</p>
+                                      {p.address && <p className="text-xs text-stone-500 mt-1">📍 {p.address}</p>}
+                                      {p.driver_name ? (
+                                          <p className="text-xs text-blue-600 mt-1 font-semibold">Driver: {p.driver_name}</p>
+                                      ) : (
+                                          <p className="text-xs text-stone-400 mt-1 italic">Waiting for assignment...</p>
+                                      )}
+                                      {p.rejection_reason && <p className="text-xs text-red-600 mt-2 font-bold">Reason: {p.rejection_reason}</p>}
+                                  </div>
+                                  
+                                  <div className="flex flex-col items-end gap-2">
+                                    <span className={`text-xs font-bold px-2 py-1 rounded ${p.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : p.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                        {p.status}
+                                    </span>
+                                    
+                                    {p.status === 'ACCEPTED' && (
+                                        <button 
+                                            onClick={() => handleMarkLoaded(p.id)}
+                                            className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-600 shadow-sm transition-colors animate-pulse"
+                                        >
+                                            Mark as Loaded 📦
+                                        </button>
+                                    )}
+                                    
+                                    {p.status === 'LOADED' && (
+                                        <span className="text-[10px] text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-100">Waiting for NGO Confirmation</span>
+                                    )}
+
+                                    {p.status === 'COMPLETED' && (
+                                        <button onClick={() => openRatingModal(p.ngo_id)} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border hover:bg-slate-200">Rate NGO</button>
+                                    )}
+                                  </div>
+                              </div>
+                          </div>
+                      ))}
+                      {pickups.length === 0 && <div className="text-center text-slate-400 py-10 bg-slate-50 rounded-xl">No history found.</div>}
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'REPORTS' && (
+              <div className="glass-panel p-8 rounded-3xl max-w-lg mx-auto text-center">
+                  <h3 className="text-xl font-bold text-slate-800 mb-6">Generate Reports</h3>
+                  <div className="space-y-4 mb-6">
+                      <div className="text-left">
+                          <label className="text-xs font-bold text-slate-500">From</label>
+                          <input type="date" className="w-full p-3 border rounded-xl" onChange={e => setReportRange({...reportRange, start: e.target.value})} />
+                      </div>
+                      <div className="text-left">
+                          <label className="text-xs font-bold text-slate-500">To</label>
+                          <input type="date" className="w-full p-3 border rounded-xl" onChange={e => setReportRange({...reportRange, end: e.target.value})} />
+                      </div>
+                  </div>
+                  <button onClick={handleDownloadReport} className="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-black transition-colors w-full">
+                      Download CSV History
+                  </button>
+              </div>
+          )}
+
+          {activeTab === 'PROFILE' && (
+              <div className="glass-panel max-w-lg mx-auto p-8 rounded-3xl text-center">
+                  <div className="w-24 h-24 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl shadow-inner text-orange-600 font-bold overflow-hidden border-4 border-white">
+                      {profile.imageUrl ? <img src={profile.imageUrl} className="w-full h-full object-cover" /> : profile.name.charAt(0)}
+                  </div>
+                  
+                  {isEditingProfile ? (
+                      <div className="space-y-4 mb-4">
+                          <input className="border p-2 rounded w-full text-center" value={profileForm.full_name} onChange={e => setProfileForm({...profileForm, full_name: e.target.value})} />
+                          <input className="border p-2 rounded w-full text-center" placeholder="Image URL" value={profileForm.imageUrl} onChange={e => setProfileForm({...profileForm, imageUrl: e.target.value})} />
+                          <input className="border p-2 rounded w-full text-center" placeholder="Address" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} />
+                          <button onClick={handleUpdateProfile} className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm">Save</button>
+                      </div>
+                  ) : (
+                      <>
+                          <h2 className="text-2xl font-bold text-slate-800 mb-1">{profile.name}</h2>
+                          <p className="text-slate-500 text-sm mb-6">{profile.address || 'Address Not Set'}</p>
+                          <button onClick={() => setIsEditingProfile(true)} className="text-blue-500 text-xs hover:underline mb-4">Edit Profile</button>
+                      </>
+                  )}
+                  
+                  <div className="text-left space-y-4">
+                      <div className="p-3 bg-white/50 rounded-xl">
+                          <label className="text-xs text-slate-400 font-bold uppercase block mb-1">Assigned NGO</label>
+                          <p className="text-slate-700 font-medium">{profile.assignedNgoId || 'Verified Partner NGO'}</p>
+                      </div>
+                  </div>
+
+                  {/* Added Rate Your NGO Section */}
+                  <div className="mt-8 pt-8 border-t border-slate-200">
+                      <h4 className="font-bold text-slate-700 mb-4">Rate Your Partner NGO</h4>
+                      <div className="flex gap-2 mb-2 justify-center">
+                          {[1,2,3,4,5].map(s => (
+                              <button key={s} onClick={() => setProfileRatingInput({...profileRatingInput, rating: s})} className={`text-2xl ${profileRatingInput.rating >= s ? 'text-yellow-400' : 'text-gray-200'}`}>★</button>
+                          ))}
+                      </div>
+                      <textarea 
+                          className="w-full p-2 border rounded-lg text-sm mb-2" 
+                          placeholder="Feedback on service..." 
+                          value={profileRatingInput.reason} 
+                          onChange={e => setProfileRatingInput({...profileRatingInput, reason: e.target.value})}
+                      ></textarea>
+                      <button onClick={handleRateAssignedNgo} className="text-xs bg-orange-100 text-orange-600 px-3 py-1 rounded font-bold hover:bg-orange-200">Submit Rating</button>
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'SETTINGS' && (
+              <div className="glass-panel max-w-2xl mx-auto p-8 rounded-3xl">
+                  <h3 className="text-xl font-bold text-slate-800 mb-6">Settings</h3>
+                  <div className="mt-8 pt-8 border-t border-slate-200">
+                      <button 
+                        onClick={initiateLogout} 
+                        className="flex items-center gap-2 bg-red-50 text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-100 transition-colors border border-red-100 w-full justify-center md:w-auto"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Log Out
+                      </button>
+                  </div>
+              </div>
+          )}
+      </DashboardLayout>
+
+      {/* RATING MODAL (Transactional) */}
+      {ratingModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+           <div className="bg-white p-6 rounded-2xl max-w-sm w-full shadow-2xl animate-fade-in">
+               <h3 className="font-bold text-lg mb-2">Rate Service</h3>
+               <p className="text-xs text-stone-500 mb-4">How was the pickup experience?</p>
+               
+               <div className="flex gap-2 justify-center mb-4">
+                   {[1,2,3,4,5].map(s => (
+                       <button key={s} onClick={() => setRatingInput({...ratingInput, rating: s})} className={`text-2xl ${ratingInput.rating >= s ? 'text-yellow-400' : 'text-stone-200'}`}>★</button>
+                   ))}
+               </div>
+               
+               <textarea 
+                   className="w-full p-2 border rounded-lg text-sm mb-4 bg-stone-50" 
+                   placeholder="Any comments?"
+                   value={ratingInput.reason}
+                   onChange={e => setRatingInput({...ratingInput, reason: e.target.value})}
+               ></textarea>
+               
+               <div className="flex gap-3">
+                   <button onClick={() => setRatingModal(null)} className="flex-1 bg-stone-100 text-stone-600 py-2 rounded-lg font-bold text-sm">Cancel</button>
+                   <button onClick={handleSubmitRating} className="flex-1 bg-slate-800 text-white py-2 rounded-lg font-bold text-sm">Submit</button>
+               </div>
+           </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Dialog */}
+      {showLogoutDialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl border border-stone-200 max-w-sm w-full mx-4 animate-fade-in">
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Confirm Logout</h3>
+            <p className="text-stone-600 mb-6">Are you sure you want to end your session?</p>
+            <div className="flex gap-4">
+              <button onClick={() => setShowLogoutDialog(false)} className="flex-1 px-4 py-2 rounded-xl font-bold text-stone-500 hover:bg-stone-100 transition-colors">Cancel</button>
+              <button onClick={() => { if(onLogout) onLogout(); setShowLogoutDialog(false); }} className="flex-1 px-4 py-2 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-lg shadow-red-500/30">Confirm</button>
             </div>
           </div>
-        )}
-
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 };
-
 export default UserDashboard;

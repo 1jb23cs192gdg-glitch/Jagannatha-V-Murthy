@@ -36,7 +36,7 @@ const Rankings = () => {
           imageUrl: t.image_url || 'https://images.unsplash.com/photo-1606293926075-69a00dbfde81?auto=format&fit=crop&q=80&w=400',
           description: t.description,
           ngoId: t.ngo_id,
-          spocDetails: t.spocDetails, // Include SPOC details
+          spocDetails: t.spocDetails, 
           address: t.address
         }));
         setTemples(formattedTemples);
@@ -82,69 +82,90 @@ const Rankings = () => {
 
   return (
     <div className="min-h-screen bg-stone-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-stone-800 mb-4">Green Temple Rankings</h1>
           <p className="text-stone-600">Celebrating temples that lead the way in sustainability and waste management.</p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           {temples.map((temple, index) => (
-            <div key={temple.id} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 flex flex-col md:flex-row items-start gap-6 transform hover:scale-[1.01] transition-transform duration-300">
-              <div className="flex-shrink-0 relative">
-                <img src={temple.imageUrl} alt={temple.name} className="w-24 h-24 md:w-32 md:h-32 rounded-xl object-cover shadow-inner" />
-                <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold shadow-lg border-2 border-white">
+            <div key={temple.id} className="bg-white rounded-3xl p-6 shadow-xl border border-stone-100 flex flex-col lg:flex-row gap-8 transform hover:-translate-y-1 transition-transform duration-300">
+              {/* Left: Image & Rank */}
+              <div className="relative w-full lg:w-1/3 h-64 lg:h-auto rounded-2xl overflow-hidden shadow-md">
+                <img src={temple.imageUrl} alt={temple.name} className="w-full h-full object-cover" />
+                <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-white flex items-center justify-center font-bold text-lg shadow-lg border-2 border-white">
                   #{index + 1}
                 </div>
               </div>
               
-              <div className="flex-1 text-center md:text-left w-full">
-                <div className="flex flex-col md:flex-row justify-between items-start">
-                    <div>
-                        <h2 className="text-2xl font-bold text-stone-800">{temple.name}</h2>
-                        <p className="text-stone-500 font-medium mb-1 flex items-center gap-1 justify-center md:justify-start">
-                            📍 {temple.address || temple.location}
-                        </p>
+              {/* Middle: Details */}
+              <div className="flex-1 flex flex-col justify-between">
+                <div>
+                    <div className="flex justify-between items-start">
+                        <h2 className="text-3xl font-bold text-stone-800 mb-1">{temple.name}</h2>
+                        <div className="text-right">
+                            <span className="text-3xl font-bold text-green-600">{temple.wasteDonatedKg.toLocaleString()}</span>
+                            <span className="block text-[10px] text-stone-400 uppercase font-bold tracking-wider">Kg Recycled</span>
+                        </div>
                     </div>
-                    <div className="text-center md:text-right mt-4 md:mt-0">
-                        <div className="text-3xl font-bold text-green-600">{temple.wasteDonatedKg.toLocaleString()}</div>
-                        <div className="text-xs text-stone-400 uppercase font-bold tracking-wider">Kg Waste Recycled</div>
-                    </div>
-                </div>
+                    
+                    <p className="text-stone-500 font-medium mb-3 flex items-center gap-1">
+                        📍 {temple.address || temple.location}
+                    </p>
 
-                <div className="flex justify-center md:justify-start gap-1 my-3">
-                   {[...Array(5)].map((_, i) => (
-                     <span key={i} className={`text-lg ${i < temple.greenStars ? 'text-yellow-400' : 'text-stone-200'}`}>★</span>
-                   ))}
+                    <div className="flex gap-1 mb-4">
+                        {[...Array(5)].map((_, i) => (
+                            <span key={i} className={`text-lg ${i < temple.greenStars ? 'text-yellow-400' : 'text-stone-200'}`}>★</span>
+                        ))}
+                    </div>
+                    
+                    <p className="text-stone-600 italic mb-4 bg-stone-50 p-3 rounded-lg border-l-4 border-orange-300">
+                        "{temple.description}"
+                    </p>
+
+                    {temple.spocDetails && (
+                        <div className="flex gap-4 items-center bg-blue-50 p-3 rounded-xl border border-blue-100">
+                            <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center text-xl">👤</div>
+                            <div>
+                                <p className="text-xs font-bold text-blue-800 uppercase">Temple SPOC</p>
+                                <p className="text-sm font-bold text-slate-700">{temple.spocDetails.name}</p>
+                                <p className="text-xs text-slate-500">{temple.spocDetails.contact}</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 
-                <p className="text-sm text-stone-600 italic mb-3">"{temple.description}"</p>
-
-                {temple.spocDetails && (
-                  <div className="text-xs bg-stone-100 p-3 rounded-lg inline-block text-left border border-stone-200">
-                    <span className="font-bold text-stone-700 block mb-1">📋 Team Contact (SPOC)</span> 
-                    <span className="block text-stone-600">{temple.spocDetails.name} <span className="text-stone-400">({temple.spocDetails.role})</span></span>
-                    <span className="block text-stone-500">📞 {temple.spocDetails.contact}</span>
-                  </div>
-                )}
-                
-                <div className="mt-4 md:text-right text-center">
+                <div className="mt-6 flex gap-4">
                     <button 
-                    onClick={() => handleViewPhotos(temple.id, temple.name, temple.imageUrl)}
-                    className="text-orange-600 text-sm font-semibold hover:bg-orange-50 px-3 py-1 rounded transition-colors"
+                        onClick={() => handleViewPhotos(temple.id, temple.name, temple.imageUrl)}
+                        className="flex-1 bg-stone-800 text-white py-2 rounded-xl text-sm font-bold hover:bg-black transition-colors"
                     >
-                    View Photos
+                        View Proof Gallery
                     </button>
                 </div>
+              </div>
+
+              {/* Right: Map Embed */}
+              <div className="w-full lg:w-1/3 h-64 rounded-2xl overflow-hidden border border-stone-200 relative bg-stone-100">
+                  <iframe 
+                      width="100%" 
+                      height="100%" 
+                      frameBorder="0" 
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(temple.address || temple.location)}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                      title={`${temple.name} Location`}
+                      className="absolute inset-0"
+                  ></iframe>
+                  <div className="absolute bottom-2 right-2 bg-white/90 px-2 py-1 text-[10px] font-bold rounded shadow text-stone-600">
+                      Live Location
+                  </div>
               </div>
             </div>
           ))}
           
           {temples.length === 0 && (
-             <div className="text-center py-20 bg-white rounded-2xl border border-stone-200 shadow-sm">
-                 <p className="text-4xl mb-4">🛕</p>
-                 <h3 className="text-xl font-bold text-stone-800">No Active Temples</h3>
-                 <p className="text-stone-500 mt-2">No temple data available in the rankings at this moment.</p>
+             <div className="text-center py-20">
+                 <p className="text-stone-400">No temples currently ranked.</p>
              </div>
           )}
         </div>
@@ -163,7 +184,7 @@ const Rankings = () => {
               <div className="flex justify-between items-center mb-6 border-b border-stone-100 pb-4">
                  <div>
                    <h2 className="text-2xl font-bold text-stone-800">{currentTempleName}</h2>
-                   <p className="text-sm text-stone-500">Activity Gallery</p>
+                   <p className="text-sm text-stone-500">Activity Gallery & Verified Proofs</p>
                  </div>
                  <button onClick={() => setGalleryOpen(false)} className="bg-stone-100 p-2 rounded-full hover:bg-stone-200 text-stone-600 transition-colors">
                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -178,28 +199,22 @@ const Rankings = () => {
                  ) : (
                    <>
                      {currentTemplePhotos.length === 0 ? (
-                       <div className="text-center py-10 text-stone-400">No photos available for this temple yet.</div>
+                       <div className="text-center py-10 text-stone-400">No additional photos uploaded.</div>
                      ) : (
                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                           {currentTemplePhotos.map((img, idx) => (
-                            <div key={idx} className="relative group overflow-hidden rounded-xl bg-stone-100 h-64">
+                            <div key={idx} className="relative group overflow-hidden rounded-xl bg-stone-100 h-64 shadow-md">
                               <img 
                                 src={img} 
                                 alt={`Gallery ${idx}`} 
                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                               />
-                              {idx === 0 && (
-                                <span className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded">Profile Pic</span>
-                              )}
                             </div>
                           ))}
                        </div>
                      )}
                    </>
                  )}
-              </div>
-              <div className="mt-4 pt-4 border-t border-stone-100 text-center text-xs text-stone-400">
-                Displaying verified proofs and temple activities.
               </div>
            </div>
         </div>

@@ -6,15 +6,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Temple to Ayurveda</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              stone: {
+                850: '#1c1917',
+                950: '#0c0a09',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
-        font-family: 'Poppins', sans-serif;
-        background-color: #fafaf9;
-        /* Subtle texture for realism */
-        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ea580c' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        font-family: 'Outfit', sans-serif;
+        background-color: #f8fafc;
+        /* Subtle mesh gradient background - Light */
+        background-image: 
+          radial-gradient(at 0% 0%, hsla(253,16%,7%,0) 0, transparent 50%), 
+          radial-gradient(at 50% 0%, hsla(225,39%,30%,0) 0, transparent 50%), 
+          radial-gradient(at 100% 0%, hsla(339,49%,30%,0) 0, transparent 50%);
+        color: #1e293b;
+        transition: background-color 0.3s ease, color 0.3s ease;
       }
-      /* Custom scrollbar for flash cards */
+
+      /* Dark Mode Overrides */
+      .dark body {
+        background-color: #0f172a; /* Slate 900 base */
+        background-image: 
+          radial-gradient(at 0% 0%, hsla(30, 80%, 20%, 0.2) 0, transparent 50%), 
+          radial-gradient(at 100% 100%, hsla(200, 80%, 20%, 0.2) 0, transparent 50%);
+        color: #e2e8f0;
+      }
+
+      /* Premium Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      
+      .dark ::-webkit-scrollbar-thumb {
+        background: #475569;
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+      }
+
       .hide-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -23,44 +75,71 @@
         scrollbar-width: none;
       }
 
-      /* Futuristic Animations */
+      /* Glassmorphism Utilities */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+      }
+      
+      .dark .glass-panel {
+        background: rgba(30, 41, 59, 0.6); /* Slate 800/60 */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+      }
+      
+      .glass-card {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+      }
+
+      .dark .glass-card {
+        background: rgba(15, 23, 42, 0.6); /* Slate 900/60 */
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      
+      .glass-card:hover {
+        background: rgba(255, 255, 255, 0.8);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      }
+
+      .dark .glass-card:hover {
+        background: rgba(30, 41, 59, 0.8);
+      }
+
+      /* Animations */
       @keyframes float {
         0% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
+        50% { transform: translateY(-6px); }
         100% { transform: translateY(0px); }
       }
       .animate-float {
-        animation: float 6s ease-in-out infinite;
+        animation: float 4s ease-in-out infinite;
       }
-
-      @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 10px rgba(234, 88, 12, 0.5); }
-        50% { box-shadow: 0 0 25px rgba(234, 88, 12, 0.8); }
+      
+      /* New Very Slow Gentle Float */
+      @keyframes gentleFloat {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-4px); }
       }
-      .animate-pulse-glow {
-        animation: pulse-glow 3s infinite;
+      .animate-gentle-float {
+        animation: gentleFloat 6s ease-in-out infinite;
       }
-
-      @keyframes grid-move {
-        0% { transform: translateY(0); }
-        100% { transform: translateY(40px); }
+      
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
       }
-      .animate-grid-move {
-        animation: grid-move 5s linear infinite;
-      }
-
-      /* Glassmorphism Utilities */
-      .glass {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-      }
-      .glass-dark {
-        background: rgba(0, 0, 0, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
     </style>
   <script type="importmap">
@@ -73,15 +152,15 @@
     "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
     "@google/genai": "https://esm.run/@google/genai",
     "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
-    "firebase/analytics": "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+    "firebase/storage": "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js",
     "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
   }
 }
 </script>
 </head>
-  <body class="bg-stone-50 text-stone-800 antialiased selection:bg-orange-500 selection:text-white">
+  <body class="antialiased selection:bg-orange-500 selection:text-white dark:bg-slate-900 dark:text-slate-100">
     <div id="root"></div>
   </body>
 </html>

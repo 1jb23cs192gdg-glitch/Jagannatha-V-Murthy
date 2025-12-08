@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
+import { RobotLogo } from '../constants';
 
 // Fix for process not defined error
 declare var process: {
@@ -12,6 +13,7 @@ declare var process: {
 interface Message {
   role: 'user' | 'model';
   text: string;
+  groundingLinks?: { title: string; uri: string }[];
 }
 
 const AIChatBot = () => {
@@ -41,18 +43,29 @@ const AIChatBot = () => {
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const model = 'gemini-3-pro-preview';
+      const model = 'gemini-2.5-flash';
       
       const response = await ai.models.generateContent({
         model: model,
         contents: userMsg,
         config: {
-          systemInstruction: "You are VEDA (Virtual Eco-Devotion Assistant), a highly advanced AI for 'Temple to Ayurveda'. You are polite, knowledgeable about Indian culture, Vedas, and modern recycling technology. Your tone is serene yet futuristic.",
+          tools: [{ googleMaps: {} }],
+          systemInstruction: "You are VEDA (Virtual Eco-Devotion Assistant), a highly advanced AI for 'Temple to Ayurveda'. You are polite, knowledgeable about Indian culture, Vedas, and modern recycling technology. Your tone is serene yet futuristic. When asked about locations or distances, use the Google Maps tool to provide accurate information.",
         }
       });
 
       const text = response.text || "I couldn't generate a response. Please try again.";
-      setMessages(prev => [...prev, { role: 'model', text }]);
+      
+      // Extract Grounding Links
+      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      const links = chunks
+        .map((c: any) => {
+           if (c.web?.uri) return { title: c.web.title || 'View on Map', uri: c.web.uri };
+           return null;
+        })
+        .filter((l: any) => l !== null);
+
+      setMessages(prev => [...prev, { role: 'model', text, groundingLinks: links }]);
 
     } catch (error) {
       console.error(error);
@@ -74,7 +87,7 @@ const AIChatBot = () => {
           <div className="relative w-full h-full bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center border-2 border-white/30 shadow-2xl overflow-hidden">
              {/* Rotating Ring */}
              <div className="absolute w-full h-full border-2 border-dashed border-white/40 rounded-full animate-[spin_10s_linear_infinite]"></div>
-             <span className="text-2xl animate-float">🕉️</span>
+             <RobotLogo className="w-8 h-8 text-white animate-float" />
           </div>
         </div>
       </button>
@@ -90,7 +103,7 @@ const AIChatBot = () => {
         <div className="bg-gradient-to-r from-orange-600/90 to-red-600/90 p-4 flex justify-between items-center backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center backdrop-blur border border-white/30">
-              <span className="text-xs">🤖</span>
+              <RobotLogo className="w-5 h-5 text-white" />
             </div>
             <div>
               <h3 className="font-bold text-white text-sm tracking-wider">VEDA AI</h3>
@@ -112,7 +125,7 @@ const AIChatBot = () => {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-thin scrollbar-thumb-orange-600/50 scrollbar-track-transparent">
           {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+            <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in-up`}>
               <div className={`max-w-[85%] rounded-2xl p-3 text-sm backdrop-blur-sm ${
                 msg.role === 'user' 
                   ? 'bg-orange-600/90 text-white rounded-br-sm shadow-[0_4px_15px_rgba(234,88,12,0.3)]' 
@@ -120,6 +133,15 @@ const AIChatBot = () => {
               }`}>
                 {msg.text}
               </div>
+              {msg.groundingLinks && msg.groundingLinks.length > 0 && (
+                 <div className="mt-2 flex flex-wrap gap-2 max-w-[85%]">
+                    {msg.groundingLinks.map((link, i) => (
+                       <a key={i} href={link.uri} target="_blank" rel="noreferrer" className="text-[10px] bg-white/10 hover:bg-white/20 border border-white/20 px-2 py-1 rounded text-orange-200 flex items-center gap-1 transition-colors">
+                          📍 {link.title}
+                       </a>
+                    ))}
+                 </div>
+              )}
             </div>
           ))}
           {isLoading && (
