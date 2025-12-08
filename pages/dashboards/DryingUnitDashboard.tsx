@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { PickupRequest, InventoryItem, Vehicle, QueryTicket, User, Temple, StockRequest, VolunteerRequest } from '../../types';
+import { PickupRequest, InventoryItem, Vehicle, QueryTicket, User, Temple, StockRequest, VolunteerRequest, VolunteerDuty } from '../../types';
 import DashboardLayout from '../../components/DashboardLayout';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area
@@ -33,6 +33,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   
   // Volunteer State
   const [duVolunteers, setDuVolunteers] = useState<VolunteerRequest[]>([]);
+  const [pendingDuties, setPendingDuties] = useState<VolunteerDuty[]>([]); // For Verification
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejectingVolunteerId, setRejectingVolunteerId] = useState<string | null>(null);
   
@@ -81,6 +82,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           fetchAssignments();
           fetchStockHistory();
           fetchVolunteers();
+          fetchPendingDuties();
       }
   }, [currentUser, activeTab]);
   
@@ -95,7 +97,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const fetchAssignments = async () => {
       if (!currentUser) return;
       
-      const { data: usersData } = await supabase.from('profiles').select('*').eq('assignedDuId', currentUser.id);
+      const { data: usersData } = await supabase.from('profiles').select('*').eq('assignedDuId', currentUser.id).eq('role', 'PERSON');
       if(usersData) {
           const mappedUsers = usersData.map((u: any) => ({ 
               ...u, 
@@ -165,6 +167,21 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       if (data) setDuVolunteers(data);
   }
 
+  const fetchPendingDuties = async () => {
+      if (!currentUser) return;
+      // Fetch duties assigned by this DU that are waiting for completion approval
+      const { data } = await supabase.from('volunteer_duties')
+        .select('*')
+        .eq('du_id', currentUser.id)
+        .eq('status', 'COMPLETION_REQUESTED');
+      
+      if (data) {
+          // Join with Volunteer Request to get name if possible, or just display ID
+          // For simplicity in this demo, assuming we display ID or fetch names
+          setPendingDuties(data);
+      }
+  }
+
   const handleVolunteerDecision = async (vol: VolunteerRequest, decision: 'ACCEPT' | 'REJECT') => {
       if(!currentUser) return;
       
@@ -201,6 +218,26 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       alert("Duty Assigned Successfully!");
       setAssigningDutyTo(null);
       setNewDuty({ title: '', description: '' });
+  }
+
+  const handleVerifyDuty = async (duty: VolunteerDuty, approved: boolean) => {
+      if (approved) {
+          // 1. Mark as Completed
+          const completedAt = new Date().toISOString();
+          await supabase.from('volunteer_duties').update({ status: 'COMPLETED', completed_at: completedAt }).eq('id', duty.id);
+          
+          // 2. Award Credits (Fetch current, add 10)
+          const { data: profile } = await supabase.from('profiles').select('green_coins').eq('id', duty.volunteer_id).single();
+          const currentCoins = profile?.green_coins || 0;
+          await supabase.from('profiles').update({ green_coins: currentCoins + 10 }).eq('id', duty.volunteer_id);
+          
+          alert("Duty Approved! 10 Green Credits awarded to volunteer.");
+      } else {
+          // Reject
+          await supabase.from('volunteer_duties').update({ status: 'REJECTED' }).eq('id', duty.id);
+          alert("Duty Rejected. No credits awarded.");
+      }
+      fetchPendingDuties();
   }
 
   const handleUpdateStatus = async (id: string, status: string, extraData: any = {}) => { 
@@ -410,10 +447,37 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'VOLUNTEERS' && (
             <div className="space-y-6">
-                {/* Pending Requests */}
+                {/* 1. Pending Duty Verification */}
+                <div className="glass-panel p-6 rounded-3xl border border-purple-100 bg-purple-50/30">
+                    <h3 className="font-bold text-purple-900 mb-4 flex items-center gap-2">
+                        <span>✅</span> Duty Completion Requests
+                        <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">{pendingDuties.length} Pending</span>
+                    </h3>
+                    <div className="space-y-3">
+                        {pendingDuties.map(duty => {
+                            const volName = duVolunteers.find(v => v.user_id === duty.volunteer_id)?.full_name || 'Volunteer';
+                            return (
+                                <div key={duty.id} className="bg-white p-4 rounded-xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div>
+                                        <h4 className="font-bold text-slate-800">{duty.title}</h4>
+                                        <p className="text-xs text-slate-600">Performed by: <strong>{volName}</strong></p>
+                                        <p className="text-xs text-slate-500 italic mt-1">{duty.description}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleVerifyDuty(duty, true)} className="bg-green-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-green-700 shadow-sm">Approve & Reward</button>
+                                        <button onClick={() => handleVerifyDuty(duty, false)} className="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200">Reject</button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {pendingDuties.length === 0 && <p className="text-stone-400 text-sm text-center py-4 bg-white/50 rounded-xl">No pending verification requests.</p>}
+                    </div>
+                </div>
+
+                {/* 2. Pending Requests */}
                 <div className="glass-panel p-6 rounded-3xl">
                     <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                        <span>🔔</span> Volunteer Requests
+                        <span>🔔</span> New Volunteer Requests
                         <span className="bg-orange-100 text-orange-600 text-xs px-2 py-1 rounded-full">{duVolunteers.filter(v => v.assignment_status === 'PENDING_DU_APPROVAL').length} New</span>
                     </h3>
                     <div className="space-y-3">
@@ -445,11 +509,11 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                 )}
                             </div>
                         ))}
-                        {duVolunteers.filter(v => v.assignment_status === 'PENDING_DU_APPROVAL').length === 0 && <p className="text-stone-400 text-sm text-center py-6">No pending volunteer requests.</p>}
+                        {duVolunteers.filter(v => v.assignment_status === 'PENDING_DU_APPROVAL').length === 0 && <p className="text-stone-400 text-sm text-center py-6">No new requests.</p>}
                     </div>
                 </div>
 
-                {/* Active Volunteers */}
+                {/* 3. Active Volunteers */}
                 <div className="glass-panel p-6 rounded-3xl">
                     <h3 className="font-bold text-slate-700 mb-4">My Active Volunteers</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -507,35 +571,45 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                         ))}
                     </div>
                 </div>
-                 {/* Assigned Users */}
+                 {/* Assigned Users (Clean View) */}
                  <div className="glass-panel p-6 rounded-3xl">
-                    <h3 className="font-bold text-slate-800 mb-4">Assigned Households</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-slate-800">Assigned Households (Users)</h3>
+                        <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-bold">{assignedUsers.length} Total</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {assignedUsers.map(u => (
-                            <div key={u.id} className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                <h4 className="font-bold text-slate-800">{u.name}</h4>
-                                <p className="text-xs text-stone-500">{u.address}</p>
+                            <div key={u.id} className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
+                                <h4 className="font-bold text-slate-800 text-sm truncate">{u.name}</h4>
                             </div>
                         ))}
                     </div>
                 </div>
-                {/* Assigned NGOs */}
+                {/* Assigned Partner (NGO + Volunteers) */}
                 <div className="glass-panel p-6 rounded-3xl">
-                    <h3 className="font-bold text-slate-800 mb-4">Assigned Partner NGOs</h3>
+                    <h3 className="font-bold text-slate-800 mb-4">Assigned Partners & Volunteers</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* NGOs */}
                         {assignedNgos.map(n => (
                             <div key={n.id} className="bg-green-50 p-4 rounded-xl border border-green-100">
                                 <h4 className="font-bold text-slate-800">{n.name}</h4>
-                                <p className="text-xs text-stone-500">{n.email}</p>
-                                <p className="text-xs font-bold text-green-600">Active Partner</p>
+                                <p className="text-xs font-bold text-green-600 mt-1">NGO Partner</p>
                             </div>
                         ))}
-                         {assignedNgos.length === 0 && <p className="text-stone-400 text-sm">No partner NGOs assigned.</p>}
+                        {/* Volunteers */}
+                        {duVolunteers.filter(v => v.assignment_status === 'ACCEPTED').map(v => (
+                            <div key={v.id} className="bg-green-50 p-4 rounded-xl border border-green-100">
+                                <h4 className="font-bold text-slate-800">{v.full_name}</h4>
+                                <p className="text-xs font-bold text-orange-600 mt-1">Volunteer</p>
+                            </div>
+                        ))}
+                        {assignedNgos.length === 0 && duVolunteers.filter(v => v.assignment_status === 'ACCEPTED').length === 0 && <p className="text-stone-400 text-sm">No partners assigned.</p>}
                     </div>
                 </div>
             </div>
         )}
 
+        {/* ... Rest of tabs (QUERIES, WAREHOUSE, HISTORY, ANALYTICS, LOGISTICS, SETTINGS) remain mostly unchanged ... */}
         {activeTab === 'QUERIES' && (
               <div className="glass-panel p-6 rounded-3xl">
                   <h3 className="font-bold text-slate-700 mb-6">Received Queries</h3>

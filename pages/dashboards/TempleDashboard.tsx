@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Temple, FlashUpdate, PickupRequest, TemplePhoto, UserRole } from '../../types';
@@ -101,6 +102,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
              setTemple({ 
                  ...data, 
                  ngoId: data.ngo_id, 
+                 duId: data.du_id || data.duId, // Capture DU ID
                  wasteDonatedKg: data.waste_donated_kg || 0, 
                  greenStars: data.green_stars || 0,
                  imageUrl: data.image_url || 'https://via.placeholder.com/150' 
@@ -121,37 +123,40 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const handleSubmitWaste = async () => {
     if (!temple || !wasteInput.amount || !wasteInput.photo) return alert("Please include weight and proof photo.");
     
-    // Ensure an NGO is selected. If not, use a default ID (crucial fix for visibility)
-    // In a real app, we should block if no NGO is assigned, but for demo continuity we fallback
-    const targetNgo = temple.ngoId || 'ngo1';
+    // Strict Rule: Temple Pickup -> Drying Unit
+    // If duId is missing, fallback to ngoId for legacy, but warn.
+    const targetReceiver = temple.duId || temple.ngoId;
+    
+    if (!targetReceiver) {
+        return alert("No Drying Unit assigned to this Temple. Please contact Admin.");
+    }
 
     // Log Record (Internal Temple Log)
     await supabase.from('temple_waste_logs').insert([{
       temple_id: temple.id, 
-      ngo_id: targetNgo, 
+      ngo_id: targetReceiver, 
       amount_kg: parseFloat(wasteInput.amount), 
       waste_type: wasteInput.type, 
       image_url: wasteInput.photo, 
       created_at: new Date().toISOString()
     }]);
     
-    // Create Pickup Request - Mapping Description (remarks) correctly
-    // This is the record the NGO dashboard will read
+    // Create Pickup Request - Status PENDING (Requested)
     await supabase.from('pickup_requests').insert([{
       requester_id: temple.id, 
       requester_type: 'TEMPLE', 
-      ngo_id: targetNgo, 
-      status: 'PENDING', 
+      ngo_id: targetReceiver, 
+      status: 'PENDING', // Maps to "Pickup Requested" in flow
       scheduled_date: wasteInput.date, 
       time_slot: wasteInput.time, 
-      remarks: wasteInput.remarks || 'No description provided', // Ensure value is passed
+      remarks: wasteInput.remarks || 'Pickup Requested by Temple', 
       estimated_weight: parseFloat(wasteInput.amount), 
       waste_type: wasteInput.type, 
       image_url: wasteInput.photo, 
       created_at: new Date().toISOString()
     }]);
     
-    alert("Pickup Requested successfully! Description and details sent to NGO."); 
+    alert("Pickup Requested Successfully! Sent to Drying Unit."); 
     setWasteInput({ ...wasteInput, amount: '', photo: null, remarks: '' }); 
     fetchWasteLogs(); 
     fetchPickups();
@@ -165,7 +170,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           alert("Error updating status. Please try again.");
       } else {
           fetchPickups();
-          alert("Status updated to Loaded! Waiting for NGO final confirmation.");
+          alert("Status updated to Loaded! Waiting for Drying Unit final confirmation.");
       }
   }
 
@@ -203,10 +208,10 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   };
 
   const handleRateNgo = async () => {
-      if(!temple || !temple.ngoId) return alert("No NGO assigned");
+      if(!temple || !temple.ngoId) return alert("No Entity assigned to rate");
       await supabase.from('ratings').insert([{
           from_id: temple.id,
-          to_id: temple.ngoId,
+          to_id: temple.ngoId || temple.duId,
           rating: ratingInput.rating,
           reason: ratingInput.reason,
           created_at: new Date().toISOString()
@@ -302,7 +307,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           {activeTab === 'WASTE' && (
               <div className="glass-panel max-w-xl mx-auto p-8 rounded-3xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-green-100 rounded-full blur-3xl -z-10"></div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-6">Daily Waste Report</h3>
+                  <h3 className="text-xl font-bold text-slate-800 mb-6">Log Temple Waste</h3>
                   <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                           <input type="date" value={wasteInput.date} onChange={e => setWasteInput({...wasteInput, date: e.target.value})} className="p-3 rounded-xl bg-white/50 border border-slate-200" />
@@ -331,7 +336,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                               {wasteInput.photo ? <img src={wasteInput.photo} className="h-20 w-20 object-cover rounded-lg" /> : <span>📸 Upload Proof</span>}
                           </label>
                       </div>
-                      <button onClick={handleSubmitWaste} className="w-full py-3 bg-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/30 hover:bg-orange-600 transition-colors">Submit Report</button>
+                      <button onClick={handleSubmitWaste} className="w-full py-3 bg-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/30 hover:bg-orange-600 transition-colors">Submit Pickup Request</button>
                   </div>
               </div>
           )}
@@ -366,7 +371,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                                   <p className="text-slate-500">{p.vehicle_no}</p>
                                               </div>
                                           ) : (
-                                              <span className="text-slate-400 text-xs">Waiting...</span>
+                                              <span className="text-slate-400 text-xs">Waiting assignment...</span>
                                           )}
                                       </td>
                                       <td className="py-3">
@@ -374,7 +379,7 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                               <button onClick={() => handleMarkLoaded(p.id)} className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-600 shadow-sm animate-pulse">Mark Loaded 📦</button>
                                           ) : (
                                               <span className={`px-2 py-1 rounded text-xs font-bold ${p.status === 'COMPLETED' ? 'bg-green-100 text-green-600' : p.status === 'LOADED' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
-                                                  {p.status === 'LOADED' ? 'Loaded & Waiting' : p.status}
+                                                  {p.status === 'LOADED' ? 'Loaded & Waiting' : p.status === 'PENDING' ? 'Pickup Requested' : p.status}
                                               </span>
                                           )}
                                       </td>
@@ -492,13 +497,13 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           <p className="font-semibold text-slate-700">{temple.spocDetails?.name || 'N/A'}</p>
                       </div>
                       <div className="bg-white/50 p-4 rounded-xl">
-                          <label className="text-xs text-slate-400 font-bold uppercase">NGO Partner</label>
-                          <p className="font-semibold text-slate-700">{temple.ngoId || 'Unassigned'}</p>
+                          <label className="text-xs text-slate-400 font-bold uppercase">Assigned Drying Unit</label>
+                          <p className="font-semibold text-slate-700">{temple.duId || temple.ngoId || 'Unassigned'}</p>
                       </div>
                   </div>
 
                   <div className="mt-8 pt-8 border-t border-slate-200">
-                      <h4 className="font-bold text-slate-700 mb-4">Rate Your NGO</h4>
+                      <h4 className="font-bold text-slate-700 mb-4">Rate Your Drying Unit</h4>
                       <div className="flex gap-2 mb-2">
                           {[1,2,3,4,5].map(s => <button key={s} onClick={() => setRatingInput({...ratingInput, rating: s})} className={`text-2xl ${ratingInput.rating >= s ? 'text-yellow-400' : 'text-gray-200'}`}>★</button>)}
                       </div>

@@ -354,389 +354,405 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   ];
 
   return (
-    <DashboardLayout 
-        title="Admin Command Center" 
-        user={user}
-        sidebarItems={sidebarItems} 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onLogout={() => setShowLogoutDialog(true)}
-        onSearch={setSearchQuery}
-      >
-        {activeTab === 'OVERVIEW' && (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
-                <div className="glass-card p-6 rounded-3xl border-l-4 border-green-500">
-                    <p className="text-stone-500 text-xs font-bold uppercase">Total Waste Recycled</p>
-                    <p className="text-3xl font-bold mt-2 text-stone-800">{stats.waste > 1000 ? (stats.waste/1000).toFixed(2) + ' Tons' : stats.waste.toFixed(1) + ' Kg'}</p>
-                </div>
-                <div className="glass-card p-6 rounded-3xl border-l-4 border-blue-500">
-                    <p className="text-stone-500 text-xs font-bold uppercase">Drying Units</p>
-                    <p className="text-3xl font-bold mt-2 text-stone-800">{stats.dus}</p>
-                </div>
-                <div className="glass-card p-6 rounded-3xl border-l-4 border-orange-500">
-                    <p className="text-stone-500 text-xs font-bold uppercase">Temples</p>
-                    <p className="text-3xl font-bold mt-2 text-stone-800">{stats.temples}</p>
-                </div>
-                <div className="glass-card p-6 rounded-3xl border-l-4 border-red-500 cursor-pointer" onClick={() => setActiveTab('VERIFICATION')}>
-                    <p className="text-stone-500 text-xs font-bold uppercase">Pending DUs</p>
-                    <p className="text-3xl font-bold mt-2 text-red-600">{stats.pending}</p>
-                </div>
-             </div>
-        )}
-
-        {activeTab === 'USERS' && (
-            <div className="glass-panel p-6 rounded-3xl animate-fade-in">
-              <h3 className="font-bold text-slate-800 mb-6 text-xl">All Registered Entities</h3>
-              <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                      <thead>
-                          <tr className="text-xs text-slate-400 uppercase border-b border-slate-200">
-                              <th className="pb-3 pl-2">Name</th>
-                              <th className="pb-3">Contact / Location</th>
-                              <th className="pb-3">Role</th>
-                              <th className="pb-3">Status</th>
-                              <th className="pb-3 text-right pr-4">Action</th>
-                          </tr>
-                      </thead>
-                      <tbody className="text-sm">
-                          {/* 1. Temples */}
-                          {templeStats.map((t, idx) => (
-                              <tr key={`t-${t.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                  <td className="py-3 pl-2 font-bold text-slate-700">{t.name}</td>
-                                  <td className="py-3 text-slate-500">{t.location}</td>
-                                  <td className="py-3"><span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">TEMPLE</span></td>
-                                  <td className="py-3"><span className="text-green-600 font-bold text-xs">Active</span></td>
-                                  <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
-                              </tr>
-                          ))}
-                          {/* 2. Drying Units */}
-                          {dus.map((d, idx) => (
-                              <tr key={`d-${d.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                  <td className="py-3 pl-2 font-bold text-slate-700">{d.full_name}</td>
-                                  <td className="py-3 text-slate-500">{d.email}</td>
-                                  <td className="py-3"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">DRYING UNIT</span></td>
-                                  <td className="py-3"><span className="text-green-600 font-bold text-xs">Verified</span></td>
-                                  <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
-                              </tr>
-                          ))}
-                          {/* 3. NGOs */}
-                          {ngos.map((n, idx) => (
-                              <tr key={`n-${n.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                  <td className="py-3 pl-2 font-bold text-slate-700">{n.full_name}</td>
-                                  <td className="py-3 text-slate-500">{n.email}</td>
-                                  <td className="py-3"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">NGO</span></td>
-                                  <td className="py-3"><span className="text-green-600 font-bold text-xs">Active</span></td>
-                                  <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
-                              </tr>
-                          ))}
-                          {/* 4. Users */}
-                          {users.map((u, idx) => (
-                              <tr key={`u-${u.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                  <td className="py-3 pl-2 font-bold text-slate-700">{u.full_name || 'User'}</td>
-                                  <td className="py-3 text-slate-500">{u.email}</td>
-                                  <td className="py-3"><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-bold">USER</span></td>
-                                  <td className="py-3"><span className="text-green-600 font-bold text-xs">Active</span></td>
-                                  <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
+    <>
+      <DashboardLayout 
+          title="Admin Command Center" 
+          user={user}
+          sidebarItems={sidebarItems} 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onLogout={() => setShowLogoutDialog(true)}
+          onSearch={setSearchQuery}
+        >
+          {activeTab === 'OVERVIEW' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+                  <div className="glass-card p-6 rounded-3xl border-l-4 border-green-500">
+                      <p className="text-stone-500 text-xs font-bold uppercase">Total Waste Recycled</p>
+                      <p className="text-3xl font-bold mt-2 text-stone-800">{stats.waste > 1000 ? (stats.waste/1000).toFixed(2) + ' Tons' : stats.waste.toFixed(1) + ' Kg'}</p>
+                  </div>
+                  <div className="glass-card p-6 rounded-3xl border-l-4 border-blue-500">
+                      <p className="text-stone-500 text-xs font-bold uppercase">Drying Units</p>
+                      <p className="text-3xl font-bold mt-2 text-stone-800">{stats.dus}</p>
+                  </div>
+                  <div className="glass-card p-6 rounded-3xl border-l-4 border-orange-500">
+                      <p className="text-stone-500 text-xs font-bold uppercase">Temples</p>
+                      <p className="text-3xl font-bold mt-2 text-stone-800">{stats.temples}</p>
+                  </div>
+                  <div className="glass-card p-6 rounded-3xl border-l-4 border-red-500 cursor-pointer" onClick={() => setActiveTab('VERIFICATION')}>
+                      <p className="text-stone-500 text-xs font-bold uppercase">Pending DUs</p>
+                      <p className="text-3xl font-bold mt-2 text-red-600">{stats.pending}</p>
+                  </div>
               </div>
-            </div>
-        )}
+          )}
 
-        {activeTab === 'VOLUNTEER_REQUESTS' && (
-            <div className="glass-panel p-6 rounded-3xl">
-                <h3 className="font-bold text-slate-700 mb-6 text-xl">Pending Volunteer Applications</h3>
-                <div className="space-y-4">
-                    {volunteerRequests.map(req => (
-                        <div key={req.id} className="p-4 bg-white rounded-xl border border-stone-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div className="flex-1">
-                                <h4 className="font-bold text-slate-800">{req.full_name}</h4>
-                                <p className="text-xs text-slate-500">📞 {req.contact}</p>
-                                <p className="text-xs text-slate-500">📍 {req.taluk}, {req.district}, {req.state}</p>
-                                {req.notes && <p className="text-xs text-slate-600 italic mt-1 bg-stone-50 p-2 rounded">"{req.notes}"</p>}
-                                <button 
-                                    onClick={() => setViewingProof(req.id_proof_url)}
-                                    className="text-xs text-blue-600 font-bold mt-2 hover:underline flex items-center gap-1"
-                                >
-                                    🆔 View ID Proof
-                                </button>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => handleVolunteerAction(req, 'APPROVED')} className="bg-green-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-green-700">Approve</button>
-                                <button onClick={() => handleVolunteerAction(req, 'REJECTED')} className="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200">Reject</button>
-                            </div>
-                        </div>
-                    ))}
-                    {volunteerRequests.length === 0 && <p className="text-center text-stone-400 py-10">No pending requests.</p>}
+          {activeTab === 'USERS' && (
+              <div className="glass-panel p-6 rounded-3xl animate-fade-in">
+                <h3 className="font-bold text-slate-800 mb-6 text-xl">All Registered Entities</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="text-xs text-slate-400 uppercase border-b border-slate-200">
+                                <th className="pb-3 pl-2">Name</th>
+                                <th className="pb-3">Contact / Location</th>
+                                <th className="pb-3">Role</th>
+                                <th className="pb-3">Status</th>
+                                <th className="pb-3 text-right pr-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm">
+                            {/* 1. Temples */}
+                            {templeStats.map((t, idx) => (
+                                <tr key={`t-${t.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 pl-2 font-bold text-slate-700">{t.name}</td>
+                                    <td className="py-3 text-slate-500">{t.location}</td>
+                                    <td className="py-3"><span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">TEMPLE</span></td>
+                                    <td className="py-3"><span className="text-green-600 font-bold text-xs">Active</span></td>
+                                    <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
+                                </tr>
+                            ))}
+                            {/* 2. Drying Units */}
+                            {dus.map((d, idx) => (
+                                <tr key={`d-${d.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 pl-2 font-bold text-slate-700">{d.full_name}</td>
+                                    <td className="py-3 text-slate-500">{d.email}</td>
+                                    <td className="py-3"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">DRYING UNIT</span></td>
+                                    <td className="py-3"><span className="text-green-600 font-bold text-xs">Verified</span></td>
+                                    <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
+                                </tr>
+                            ))}
+                            {/* 3. NGOs */}
+                            {ngos.map((n, idx) => (
+                                <tr key={`n-${n.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 pl-2 font-bold text-slate-700">{n.full_name}</td>
+                                    <td className="py-3 text-slate-500">{n.email}</td>
+                                    <td className="py-3"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">NGO</span></td>
+                                    <td className="py-3"><span className="text-green-600 font-bold text-xs">Active</span></td>
+                                    <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
+                                </tr>
+                            ))}
+                            {/* 4. Users */}
+                            {users.map((u, idx) => (
+                                <tr key={`u-${u.id}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                    <td className="py-3 pl-2 font-bold text-slate-700">{u.full_name || 'User'}</td>
+                                    <td className="py-3 text-slate-500">{u.email}</td>
+                                    <td className="py-3"><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-bold">USER</span></td>
+                                    <td className="py-3"><span className="text-green-600 font-bold text-xs">Active</span></td>
+                                    <td className="py-3 text-right pr-4"><button className="text-xs text-blue-500 hover:underline">View</button></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-        )}
+              </div>
+          )}
 
-        {activeTab === 'VOLUNTEERS' && (
-            <div className="glass-panel p-6 rounded-3xl">
-                <h3 className="font-bold text-slate-700 mb-6 text-xl">Active Community Volunteers</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {activeVolunteers.map(vol => {
-                        const assignedDu = dus.find(d => d.id === vol.assigned_du_id);
-                        return (
-                            <div key={vol.id} className="bg-white p-6 rounded-2xl border border-green-100 shadow-sm relative group">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h4 className="font-bold text-slate-800">{vol.full_name}</h4>
-                                        <p className="text-xs text-slate-500 font-medium">Joined: {new Date(vol.created_at).toLocaleDateString()}</p>
-                                    </div>
-                                    <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">ACTIVE</span>
-                                </div>
-                                <div className="mt-4 space-y-1">
-                                    <p className="text-xs text-slate-600">📞 {vol.contact}</p>
-                                    <p className="text-xs text-slate-600">📍 {vol.taluk}, {vol.district}</p>
-                                </div>
-                                
-                                <div className="mt-4 pt-3 border-t border-slate-100 bg-stone-50 p-2 rounded-lg">
-                                    <p className="text-[10px] text-stone-400 uppercase font-bold">Assigned Unit</p>
-                                    {assignedDu ? (
-                                        <p className="text-xs font-bold text-blue-600">{assignedDu.full_name}</p>
-                                    ) : (
-                                        <p className="text-xs text-stone-500 italic">Not Assigned</p>
-                                    )}
-                                    {vol.assignment_status === 'PENDING_DU_APPROVAL' && (
-                                        <p className="text-[10px] text-orange-500 font-bold mt-1">Status: Pending DU Approval</p>
-                                    )}
-                                    {vol.assignment_status === 'REJECTED_BY_DU' && (
-                                        <p className="text-[10px] text-red-500 font-bold mt-1">Rejected by DU: {vol.rejection_reason}</p>
-                                    )}
-                                </div>
-
-                                <div className="mt-2 flex justify-between items-center pt-2">
-                                    <button onClick={() => setViewingProof(vol.id_proof_url)} className="text-xs text-blue-500 font-bold">View ID</button>
-                                    <button onClick={() => handleDeactivateVolunteer(vol)} className="text-xs text-red-500 font-bold hover:underline">Remove</button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                    {activeVolunteers.length === 0 && <p className="col-span-full text-center text-stone-400 py-10">No active volunteers.</p>}
-                </div>
-            </div>
-        )}
-
-        {/* Modal for ID Proof */}
-        {viewingProof && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setViewingProof(null)}>
-                <div className="bg-white p-2 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden relative" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setViewingProof(null)} className="absolute top-2 right-2 bg-stone-100 rounded-full p-2 hover:bg-red-100 text-stone-600 hover:text-red-600">✕</button>
-                    <img src={viewingProof} alt="ID Proof" className="w-full h-full object-contain" />
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'ANALYTICS' && (
-          <div className="space-y-6">
-             {/* 1. Category Selection */}
-             {!selectedEntity && (
-                <div className="flex flex-col items-center">
-                   <div className="flex bg-white p-1 rounded-xl shadow-sm border border-stone-100 mb-8">
-                      {['TEMPLE', 'USER', 'NGO', 'DRYING_UNIT'].map(cat => (
-                          <button 
-                            key={cat}
-                            onClick={() => setAnalyticsCategory(cat as any)} 
-                            className={`px-6 py-3 rounded-xl font-bold text-xs md:text-sm transition-all ${analyticsCategory === cat ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                          >
-                              {cat === 'DRYING_UNIT' ? 'Drying Units' : cat + 's'}
-                          </button>
-                      ))}
-                   </div>
-
-                   <h3 className="font-bold text-slate-700 mb-6 text-xl">Select {analyticsCategory} to View Analytics</h3>
-                   
-                   {/* 2. Entity List */}
-                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full max-w-6xl">
-                       {analyticsCategory === 'TEMPLE' && templeStats.map(t => (
-                           <div key={t.id} onClick={() => setSelectedEntity(t)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
-                               <h4 className="font-bold text-slate-800 group-hover:text-orange-600 transition-colors">{t.name}</h4>
-                               <p className="text-xs text-stone-500">{t.location}</p>
-                           </div>
-                       ))}
-                       {analyticsCategory === 'USER' && users.map(u => (
-                           <div key={u.id} onClick={() => setSelectedEntity(u)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
-                               <h4 className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{u.full_name || 'User'}</h4>
-                               <p className="text-xs text-stone-500">{u.email}</p>
-                           </div>
-                       ))}
-                       {analyticsCategory === 'DRYING_UNIT' && dus.map(d => (
-                           <div key={d.id} onClick={() => setSelectedEntity(d)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
-                               <h4 className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{d.full_name}</h4>
-                               <p className="text-xs text-stone-500">{d.email}</p>
-                           </div>
-                       ))}
-                       {analyticsCategory === 'NGO' && ngos.map(n => (
-                           <div key={n.id} onClick={() => setSelectedEntity(n)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
-                               <h4 className="font-bold text-slate-800 group-hover:text-green-600 transition-colors">{n.full_name}</h4>
-                               <p className="text-xs text-stone-500">{n.email}</p>
-                           </div>
-                       ))}
-                   </div>
-                   
-                   {/* Empty States */}
-                   {analyticsCategory === 'TEMPLE' && templeStats.length === 0 && <p className="text-stone-400">No temples found.</p>}
-                   {analyticsCategory === 'USER' && users.length === 0 && <p className="text-stone-400">No users found.</p>}
-                   {analyticsCategory === 'DRYING_UNIT' && dus.length === 0 && <p className="text-stone-400">No drying units found.</p>}
-                   {analyticsCategory === 'NGO' && ngos.length === 0 && <p className="text-stone-400">No NGOs found.</p>}
-                </div>
-             )}
-
-             {/* 3. Detailed Graph View */}
-             {selectedEntity && renderEntityAnalytics()}
-          </div>
-        )}
-
-        {activeTab === 'ALLOCATION' && (
-            <div className="glass-panel p-8 rounded-3xl max-w-4xl mx-auto">
-                <h3 className="text-2xl font-bold text-slate-800 mb-6">Resource Allocation</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <label className="block text-sm font-bold text-slate-500 mb-2 uppercase">1. Allocation Type</label>
-                        <div className="flex flex-col gap-2 mb-6">
-                            <button onClick={() => setAllocation({...allocation, type: 'USER_TO_DU'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'USER_TO_DU' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-slate-500 border-slate-200'}`}>User ➔ Drying Unit</button>
-                            <button onClick={() => setAllocation({...allocation, type: 'TEMPLE_TO_DU'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'TEMPLE_TO_DU' ? 'bg-purple-500 text-white border-purple-500' : 'bg-white text-slate-500 border-slate-200'}`}>Temple ➔ Drying Unit</button>
-                            <button onClick={() => setAllocation({...allocation, type: 'DU_TO_NGO'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'DU_TO_NGO' ? 'bg-green-500 text-white border-green-500' : 'bg-white text-slate-500 border-slate-200'}`}>Drying Unit ➔ Partner NGO</button>
-                            <button onClick={() => setAllocation({...allocation, type: 'VOLUNTEER_TO_DU'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'VOLUNTEER_TO_DU' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-500 border-slate-200'}`}>Volunteer ➔ Drying Unit</button>
-                        </div>
-                    </div>
-                    <div>
-                        {allocation.type === 'USER_TO_DU' && (
-                            <div className="space-y-4">
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Select User</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
-                                    <option value="">-- Choose User --</option>
-                                    {users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
-                                </select>
-                                <div className="flex gap-2">
-                                    <input placeholder="District" className="flex-1 p-3 rounded-xl border" value={allocation.district} onChange={e => setAllocation({...allocation, district: e.target.value})} />
-                                    <input placeholder="Taluk" className="flex-1 p-3 rounded-xl border" value={allocation.taluk} onChange={e => setAllocation({...allocation, taluk: e.target.value})} />
-                                </div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Assign Drying Unit</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
-                                    <option value="">-- Choose DU --</option>
-                                    {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                                </select>
-                            </div>
-                        )}
-                        {allocation.type === 'TEMPLE_TO_DU' && (
-                            <div className="space-y-4">
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Select Temple</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
-                                    <option value="">-- Choose Temple --</option>
-                                    {templeStats.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                </select>
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Assign Drying Unit</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
-                                    <option value="">-- Choose DU --</option>
-                                    {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                                </select>
-                            </div>
-                        )}
-                        {allocation.type === 'DU_TO_NGO' && (
-                            <div className="space-y-4">
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Select Drying Unit (Source)</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
-                                    <option value="">-- Choose DU --</option>
-                                    {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                                </select>
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Assign to Partner NGO</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
-                                    <option value="">-- Choose NGO --</option>
-                                    {ngos.map(n => <option key={n.id} value={n.id}>{n.full_name}</option>)}
-                                </select>
-                            </div>
-                        )}
-                        {allocation.type === 'VOLUNTEER_TO_DU' && (
-                            <div className="space-y-4">
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Select Approved Volunteer</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
-                                    <option value="">-- Choose Volunteer --</option>
-                                    {activeVolunteers.filter(v => v.assignment_status !== 'ACCEPTED').map(v => (
-                                        <option key={v.id} value={v.id}>{v.full_name} ({v.district})</option>
-                                    ))}
-                                </select>
-                                <label className="block text-xs font-bold text-slate-400 uppercase">Assign to Drying Unit</label>
-                                <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
-                                    <option value="">-- Choose DU --</option>
-                                    {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-                                </select>
-                            </div>
-                        )}
-                        <button onClick={handleAllocation} className="w-full mt-6 py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-black transition-colors shadow-lg">Confirm Allocation</button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'VERIFICATION' && (
-             <div className="glass-panel rounded-3xl p-6 bg-orange-50/50 border border-orange-100">
-                  <h3 className="font-bold text-lg text-slate-800 mb-4">Pending Drying Unit Approvals</h3>
+          {activeTab === 'VOLUNTEER_REQUESTS' && (
+              <div className="glass-panel p-6 rounded-3xl">
+                  <h3 className="font-bold text-slate-700 mb-6 text-xl">Pending Volunteer Applications</h3>
                   <div className="space-y-4">
-                      {pendingDus.map(du => (
-                          <div key={du.id} className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                              <div><p className="font-bold">{du.full_name}</p><p className="text-xs text-stone-500">{du.email}</p></div>
+                      {volunteerRequests.map(req => (
+                          <div key={req.id} className="p-4 bg-white rounded-xl border border-stone-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                              <div className="flex-1">
+                                  <h4 className="font-bold text-slate-800">{req.full_name}</h4>
+                                  <p className="text-xs text-slate-500">📞 {req.contact}</p>
+                                  <p className="text-xs text-slate-500">📍 {req.taluk}, {req.district}, {req.state}</p>
+                                  {req.notes && <p className="text-xs text-slate-600 italic mt-1 bg-stone-50 p-2 rounded">"{req.notes}"</p>}
+                                  <button 
+                                      onClick={() => setViewingProof(req.id_proof_url)}
+                                      className="text-xs text-blue-600 font-bold mt-2 hover:underline flex items-center gap-1"
+                                  >
+                                      🆔 View ID Proof
+                                  </button>
+                              </div>
                               <div className="flex gap-2">
-                                  <button onClick={() => handleApproveDu(du.id, du.email, true)} className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold">Approve</button>
-                                  <button onClick={() => handleApproveDu(du.id, du.email, false)} className="bg-red-100 text-red-600 px-3 py-1 rounded text-xs font-bold">Reject</button>
+                                  <button onClick={() => handleVolunteerAction(req, 'APPROVED')} className="bg-green-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-green-700">Approve</button>
+                                  <button onClick={() => handleVolunteerAction(req, 'REJECTED')} className="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200">Reject</button>
                               </div>
                           </div>
                       ))}
-                      {pendingDus.length === 0 && <p className="text-center text-stone-400">No pending approvals.</p>}
+                      {volunteerRequests.length === 0 && <p className="text-center text-stone-400 py-10">No pending requests.</p>}
                   </div>
-             </div>
-        )}
+              </div>
+          )}
 
-        {activeTab === 'RATINGS' && (
-            <div className="glass-panel p-6 rounded-3xl">
-                <h3 className="font-bold text-stone-800 mb-4">Feedback Overview</h3>
-                <div className="space-y-4 max-h-[500px] overflow-y-auto">
-                    {ratings.map(r => {
-                        const from = getNameForId(r.from_id);
-                        const to = getNameForId(r.to_id);
-                        return (
-                            <div key={r.id} className="p-4 bg-white/80 rounded-xl border border-stone-100 shadow-sm">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-stone-400">
-                                            <span>{from.role}</span><span>➔</span><span>{to.role}</span>
-                                        </div>
-                                        <p className="text-sm font-bold text-slate-800">{to.name}</p>
-                                    </div>
-                                    <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">★ {r.rating}</span>
-                                </div>
-                                {r.reason && <p className="text-xs text-stone-600 italic bg-stone-50 p-2 rounded">"{r.reason}"</p>}
+          {activeTab === 'VOLUNTEERS' && (
+              <div className="glass-panel p-6 rounded-3xl">
+                  <h3 className="font-bold text-slate-700 mb-6 text-xl">Active Community Volunteers</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {activeVolunteers.map(vol => {
+                          const assignedDu = dus.find(d => d.id === vol.assigned_du_id);
+                          return (
+                              <div key={vol.id} className="bg-white p-6 rounded-2xl border border-green-100 shadow-sm relative group">
+                                  <div className="flex justify-between items-start">
+                                      <div>
+                                          <h4 className="font-bold text-slate-800">{vol.full_name}</h4>
+                                          <p className="text-xs text-slate-500 font-medium">Joined: {new Date(vol.created_at).toLocaleDateString()}</p>
+                                      </div>
+                                      <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">ACTIVE</span>
+                                  </div>
+                                  <div className="mt-4 space-y-1">
+                                      <p className="text-xs text-slate-600">📞 {vol.contact}</p>
+                                      <p className="text-xs text-slate-600">📍 {vol.taluk}, {vol.district}</p>
+                                  </div>
+                                  
+                                  <div className="mt-4 pt-3 border-t border-slate-100 bg-stone-50 p-2 rounded-lg">
+                                      <p className="text-[10px] text-stone-400 uppercase font-bold">Assigned Unit</p>
+                                      {assignedDu ? (
+                                          <p className="text-xs font-bold text-blue-600">{assignedDu.full_name}</p>
+                                      ) : (
+                                          <p className="text-xs text-stone-500 italic">Not Assigned</p>
+                                      )}
+                                      {vol.assignment_status === 'PENDING_DU_APPROVAL' && (
+                                          <p className="text-[10px] text-orange-500 font-bold mt-1">Status: Pending DU Approval</p>
+                                      )}
+                                      {vol.assignment_status === 'REJECTED_BY_DU' && (
+                                          <p className="text-[10px] text-red-500 font-bold mt-1">Rejected by DU: {vol.rejection_reason}</p>
+                                      )}
+                                  </div>
+
+                                  <div className="mt-2 flex justify-between items-center pt-2">
+                                      <button onClick={() => setViewingProof(vol.id_proof_url)} className="text-xs text-blue-500 font-bold">View ID</button>
+                                      <button onClick={() => handleDeactivateVolunteer(vol)} className="text-xs text-red-500 font-bold hover:underline">Remove</button>
+                                  </div>
+                              </div>
+                          );
+                      })}
+                      {activeVolunteers.length === 0 && <p className="col-span-full text-center text-stone-400 py-10">No active volunteers.</p>}
+                  </div>
+              </div>
+          )}
+
+          {/* Modal for ID Proof */}
+          {viewingProof && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setViewingProof(null)}>
+                  <div className="bg-white p-2 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden relative" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setViewingProof(null)} className="absolute top-2 right-2 bg-stone-100 rounded-full p-2 hover:bg-red-100 text-stone-600 hover:text-red-600">✕</button>
+                      <img src={viewingProof} alt="ID Proof" className="w-full h-full object-contain" />
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'ANALYTICS' && (
+            <div className="space-y-6">
+              {/* 1. Category Selection */}
+              {!selectedEntity && (
+                  <div className="flex flex-col items-center">
+                    <div className="flex bg-white p-1 rounded-xl shadow-sm border border-stone-100 mb-8">
+                        {['TEMPLE', 'USER', 'NGO', 'DRYING_UNIT'].map(cat => (
+                            <button 
+                              key={cat}
+                              onClick={() => setAnalyticsCategory(cat as any)} 
+                              className={`px-6 py-3 rounded-xl font-bold text-xs md:text-sm transition-all ${analyticsCategory === cat ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                            >
+                                {cat === 'DRYING_UNIT' ? 'Drying Units' : cat + 's'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <h3 className="font-bold text-slate-700 mb-6 text-xl">Select {analyticsCategory} to View Analytics</h3>
+                    
+                    {/* 2. Entity List */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full max-w-6xl">
+                        {analyticsCategory === 'TEMPLE' && templeStats.map(t => (
+                            <div key={t.id} onClick={() => setSelectedEntity(t)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
+                                <h4 className="font-bold text-slate-800 group-hover:text-orange-600 transition-colors">{t.name}</h4>
+                                <p className="text-xs text-stone-500">{t.location}</p>
                             </div>
-                        );
-                    })}
-                </div>
-            </div>
-        )}
+                        ))}
+                        {analyticsCategory === 'USER' && users.map(u => (
+                            <div key={u.id} onClick={() => setSelectedEntity(u)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
+                                <h4 className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{u.full_name || 'User'}</h4>
+                                <p className="text-xs text-stone-500">{u.email}</p>
+                            </div>
+                        ))}
+                        {analyticsCategory === 'DRYING_UNIT' && dus.map(d => (
+                            <div key={d.id} onClick={() => setSelectedEntity(d)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
+                                <h4 className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{d.full_name}</h4>
+                                <p className="text-xs text-stone-500">{d.email}</p>
+                            </div>
+                        ))}
+                        {analyticsCategory === 'NGO' && ngos.map(n => (
+                            <div key={n.id} onClick={() => setSelectedEntity(n)} className="bg-white p-6 rounded-2xl cursor-pointer hover:shadow-lg transition-all border border-stone-100 group">
+                                <h4 className="font-bold text-slate-800 group-hover:text-green-600 transition-colors">{n.full_name}</h4>
+                                <p className="text-xs text-stone-500">{n.email}</p>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {/* Empty States */}
+                    {analyticsCategory === 'TEMPLE' && templeStats.length === 0 && <p className="text-stone-400">No temples found.</p>}
+                    {analyticsCategory === 'USER' && users.length === 0 && <p className="text-stone-400">No users found.</p>}
+                    {analyticsCategory === 'DRYING_UNIT' && dus.length === 0 && <p className="text-stone-400">No drying units found.</p>}
+                    {analyticsCategory === 'NGO' && ngos.length === 0 && <p className="text-stone-400">No NGOs found.</p>}
+                  </div>
+              )}
 
-        {activeTab === 'ANNOUNCEMENTS' && (
-            <div className="glass-panel p-6 rounded-3xl">
-                <h3 className="font-bold text-slate-800 mb-4">Create Update</h3>
-                <div className="space-y-4">
-                  <input placeholder="Title" value={updateInput.title} onChange={e => setUpdateInput({...updateInput, title: e.target.value})} className="w-full p-3 rounded-xl border" />
-                  <textarea placeholder="Content" value={updateInput.content} onChange={e => setUpdateInput({...updateInput, content: e.target.value})} className="w-full p-3 rounded-xl border h-24" />
-                  <button onClick={handleCreateUpdate} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">Publish</button>
-                </div>
+              {/* 3. Detailed Graph View */}
+              {selectedEntity && renderEntityAnalytics()}
             </div>
-        )}
+          )}
 
-        {activeTab === 'SETTINGS' && (
-            <div className="glass-panel p-8 rounded-3xl max-w-2xl mx-auto">
-                <h3 className="text-xl font-bold text-slate-800 mb-6">System Config</h3>
-                <div className="flex gap-4 mb-4"><input type="number" value={coinRate} onChange={e => setCoinRate(Number(e.target.value))} className="border rounded px-4 py-2" /><button onClick={handleSaveCoinRate} className="bg-slate-800 text-white px-4 py-2 rounded">Set Coin Rate</button></div>
-                <div className="flex gap-4 mb-4"><input value={shopUrl} onChange={e => setShopUrl(e.target.value)} className="border rounded px-4 py-2 flex-1" /><button onClick={handleSaveShopUrl} className="bg-slate-800 text-white px-4 py-2 rounded">Set Shop URL</button></div>
-                <button onClick={() => setShowLogoutDialog(true)} className="w-full bg-red-600 text-white py-3 rounded-xl font-bold">Logout</button>
+          {activeTab === 'ALLOCATION' && (
+              <div className="glass-panel p-8 rounded-3xl max-w-4xl mx-auto">
+                  <h3 className="text-2xl font-bold text-slate-800 mb-6">Resource Allocation</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div>
+                          <label className="block text-sm font-bold text-slate-500 mb-2 uppercase">1. Allocation Type</label>
+                          <div className="flex flex-col gap-2 mb-6">
+                              <button onClick={() => setAllocation({...allocation, type: 'USER_TO_DU'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'USER_TO_DU' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-slate-500 border-slate-200'}`}>User ➔ Drying Unit</button>
+                              <button onClick={() => setAllocation({...allocation, type: 'TEMPLE_TO_DU'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'TEMPLE_TO_DU' ? 'bg-purple-500 text-white border-purple-500' : 'bg-white text-slate-500 border-slate-200'}`}>Temple ➔ Drying Unit</button>
+                              <button onClick={() => setAllocation({...allocation, type: 'DU_TO_NGO'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'DU_TO_NGO' ? 'bg-green-500 text-white border-green-500' : 'bg-white text-slate-500 border-slate-200'}`}>Drying Unit ➔ Partner NGO</button>
+                              <button onClick={() => setAllocation({...allocation, type: 'VOLUNTEER_TO_DU'})} className={`py-3 px-4 rounded-xl font-bold border text-left ${allocation.type === 'VOLUNTEER_TO_DU' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-500 border-slate-200'}`}>Volunteer ➔ Drying Unit</button>
+                          </div>
+                      </div>
+                      <div>
+                          {allocation.type === 'USER_TO_DU' && (
+                              <div className="space-y-4">
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Select User</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
+                                      <option value="">-- Choose User --</option>
+                                      {users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
+                                  </select>
+                                  <div className="flex gap-2">
+                                      <input placeholder="District" className="flex-1 p-3 rounded-xl border" value={allocation.district} onChange={e => setAllocation({...allocation, district: e.target.value})} />
+                                      <input placeholder="Taluk" className="flex-1 p-3 rounded-xl border" value={allocation.taluk} onChange={e => setAllocation({...allocation, taluk: e.target.value})} />
+                                  </div>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Assign Drying Unit</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
+                                      <option value="">-- Choose DU --</option>
+                                      {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                                  </select>
+                              </div>
+                          )}
+                          {allocation.type === 'TEMPLE_TO_DU' && (
+                              <div className="space-y-4">
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Select Temple</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
+                                      <option value="">-- Choose Temple --</option>
+                                      {templeStats.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                  </select>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Assign Drying Unit</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
+                                      <option value="">-- Choose DU --</option>
+                                      {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                                  </select>
+                              </div>
+                          )}
+                          {allocation.type === 'DU_TO_NGO' && (
+                              <div className="space-y-4">
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Select Drying Unit (Source)</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
+                                      <option value="">-- Choose DU --</option>
+                                      {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                                  </select>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Assign to Partner NGO</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
+                                      <option value="">-- Choose NGO --</option>
+                                      {ngos.map(n => <option key={n.id} value={n.id}>{n.full_name}</option>)}
+                                  </select>
+                              </div>
+                          )}
+                          {allocation.type === 'VOLUNTEER_TO_DU' && (
+                              <div className="space-y-4">
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Select Approved Volunteer</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
+                                      <option value="">-- Choose Volunteer --</option>
+                                      {activeVolunteers.filter(v => v.assignment_status !== 'ACCEPTED').map(v => (
+                                          <option key={v.id} value={v.id}>{v.full_name} ({v.district})</option>
+                                      ))}
+                                  </select>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">Assign to Drying Unit</label>
+                                  <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>
+                                      <option value="">-- Choose DU --</option>
+                                      {dus.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+                                  </select>
+                              </div>
+                          )}
+                          <button onClick={handleAllocation} className="w-full mt-6 py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-black transition-colors shadow-lg">Confirm Allocation</button>
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'VERIFICATION' && (
+              <div className="glass-panel rounded-3xl p-6 bg-orange-50/50 border border-orange-100">
+                    <h3 className="font-bold text-lg text-slate-800 mb-4">Pending Drying Unit Approvals</h3>
+                    <div className="space-y-4">
+                        {pendingDus.map(du => (
+                            <div key={du.id} className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
+                                <div><p className="font-bold">{du.full_name}</p><p className="text-xs text-stone-500">{du.email}</p></div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleApproveDu(du.id, du.email, true)} className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold">Approve</button>
+                                    <button onClick={() => handleApproveDu(du.id, du.email, false)} className="bg-red-100 text-red-600 px-3 py-1 rounded text-xs font-bold">Reject</button>
+                                </div>
+                            </div>
+                        ))}
+                        {pendingDus.length === 0 && <p className="text-center text-stone-400">No pending approvals.</p>}
+                    </div>
+              </div>
+          )}
+
+          {activeTab === 'RATINGS' && (
+              <div className="glass-panel p-6 rounded-3xl">
+                  <h3 className="font-bold text-stone-800 mb-4">Feedback Overview</h3>
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                      {ratings.map(r => {
+                          const from = getNameForId(r.from_id);
+                          const to = getNameForId(r.to_id);
+                          return (
+                              <div key={r.id} className="p-4 bg-white/80 rounded-xl border border-stone-100 shadow-sm">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <div className="flex flex-col gap-1">
+                                          <div className="flex items-center gap-1 text-[10px] font-bold uppercase text-stone-400">
+                                              <span>{from.role}</span><span>➔</span><span>{to.role}</span>
+                                          </div>
+                                          <p className="text-sm font-bold text-slate-800">{to.name}</p>
+                                      </div>
+                                      <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-1 rounded">★ {r.rating}</span>
+                                  </div>
+                                  {r.reason && <p className="text-xs text-stone-600 italic bg-stone-50 p-2 rounded">"{r.reason}"</p>}
+                              </div>
+                          );
+                      })}
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'ANNOUNCEMENTS' && (
+              <div className="glass-panel p-6 rounded-3xl">
+                  <h3 className="font-bold text-slate-800 mb-4">Create Update</h3>
+                  <div className="space-y-4">
+                    <input placeholder="Title" value={updateInput.title} onChange={e => setUpdateInput({...updateInput, title: e.target.value})} className="w-full p-3 rounded-xl border" />
+                    <textarea placeholder="Content" value={updateInput.content} onChange={e => setUpdateInput({...updateInput, content: e.target.value})} className="w-full p-3 rounded-xl border h-24" />
+                    <button onClick={handleCreateUpdate} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">Publish</button>
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'SETTINGS' && (
+              <div className="glass-panel p-8 rounded-3xl max-w-2xl mx-auto">
+                  <h3 className="text-xl font-bold text-slate-800 mb-6">System Config</h3>
+                  <div className="flex gap-4 mb-4"><input type="number" value={coinRate} onChange={e => setCoinRate(Number(e.target.value))} className="border rounded px-4 py-2" /><button onClick={handleSaveCoinRate} className="bg-slate-800 text-white px-4 py-2 rounded">Set Coin Rate</button></div>
+                  <div className="flex gap-4 mb-4"><input value={shopUrl} onChange={e => setShopUrl(e.target.value)} className="border rounded px-4 py-2 flex-1" /><button onClick={handleSaveShopUrl} className="bg-slate-800 text-white px-4 py-2 rounded">Set Shop URL</button></div>
+                  <button onClick={() => setShowLogoutDialog(true)} className="w-full bg-red-600 text-white py-3 rounded-xl font-bold">Logout</button>
+              </div>
+          )}
+      </DashboardLayout>
+
+      {/* Logout Confirmation Dialog */}
+      {showLogoutDialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl border border-stone-200 max-w-sm w-full mx-4 animate-fade-in">
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Confirm Logout</h3>
+            <p className="text-stone-600 mb-6">Are you sure you want to end your session?</p>
+            <div className="flex gap-4">
+              <button onClick={() => setShowLogoutDialog(false)} className="flex-1 px-4 py-2 rounded-xl font-bold text-stone-500 hover:bg-stone-100 transition-colors">Cancel</button>
+              <button onClick={() => { if(onLogout) onLogout(); setShowLogoutDialog(false); }} className="flex-1 px-4 py-2 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-lg shadow-red-500/30">Confirm</button>
             </div>
-        )}
-    </DashboardLayout>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 export default AdminDashboard;
