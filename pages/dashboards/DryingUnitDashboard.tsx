@@ -46,7 +46,8 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [loadingLocations, setLoadingLocations] = useState<Record<string, boolean>>({});
   const [liveTrackingModal, setLiveTrackingModal] = useState<string | null>(null); 
 
-  const [newVehicle, setNewVehicle] = useState({ driver: '', vehicleNo: '', email: '' });
+  // Updated Vehicle State for new driver fields
+  const [newVehicle, setNewVehicle] = useState({ driver: '', vehicleNo: '', phone: '', license: '' });
   const [newItem, setNewItem] = useState({ name: '', stock: 0, price: 0 }); 
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
@@ -280,11 +281,19 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   };
 
   const handleAddVehicle = async () => {
-      if (!currentUser || !newVehicle.driver || !newVehicle.vehicleNo) return alert("Fill all details");
+      if (!currentUser || !newVehicle.driver || !newVehicle.vehicleNo) return alert("Fill Driver Name and Vehicle No.");
+      
       const { data } = await supabase.from('vehicles').insert([{ 
-          ngo_id: currentUser.id, driver_name: newVehicle.driver, vehicle_no: newVehicle.vehicleNo, status: 'IDLE', current_location: 'Hub'
+          ngo_id: currentUser.id, 
+          driver_name: newVehicle.driver, 
+          vehicle_no: newVehicle.vehicleNo, 
+          phone: newVehicle.phone,
+          license: newVehicle.license,
+          status: 'IDLE', 
+          current_location: 'Drying Unit Hub'
       }]);
-      setNewVehicle({ driver: '', vehicleNo: '', email: '' });
+      setNewVehicle({ driver: '', vehicleNo: '', phone: '', license: '' });
+      alert("New Driver & Vehicle Added Successfully!");
       fetchRoutes();
   };
 
@@ -653,6 +662,43 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'LOGISTICS' && (
               <div className="space-y-6">
+                  {/* Fleet Management - Create Driver */}
+                  <div className="glass-panel p-6 rounded-3xl">
+                      <h3 className="font-bold text-slate-800 text-xl mb-4">Fleet & Driver Management</h3>
+                      <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
+                          <h4 className="text-sm font-bold text-stone-600 mb-3 uppercase tracking-wide">Add New Driver</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                              <input 
+                                  placeholder="Driver Name" 
+                                  className="p-3 rounded-xl border border-stone-200 text-sm" 
+                                  value={newVehicle.driver} 
+                                  onChange={e => setNewVehicle({...newVehicle, driver: e.target.value})} 
+                              />
+                              <input 
+                                  placeholder="Phone Number" 
+                                  className="p-3 rounded-xl border border-stone-200 text-sm" 
+                                  value={newVehicle.phone} 
+                                  onChange={e => setNewVehicle({...newVehicle, phone: e.target.value})} 
+                              />
+                              <input 
+                                  placeholder="Vehicle Number" 
+                                  className="p-3 rounded-xl border border-stone-200 text-sm" 
+                                  value={newVehicle.vehicleNo} 
+                                  onChange={e => setNewVehicle({...newVehicle, vehicleNo: e.target.value})} 
+                              />
+                              <input 
+                                  placeholder="License No." 
+                                  className="p-3 rounded-xl border border-stone-200 text-sm" 
+                                  value={newVehicle.license} 
+                                  onChange={e => setNewVehicle({...newVehicle, license: e.target.value})} 
+                              />
+                          </div>
+                          <button onClick={handleAddVehicle} className="bg-slate-800 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors w-full md:w-auto">
+                              + Create Driver Profile
+                          </button>
+                      </div>
+                  </div>
+
                   {/* Live Operations Center */}
                   <div className="glass-panel p-6 rounded-3xl">
                       <div className="flex justify-between items-center mb-6">
@@ -696,11 +742,13 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                           <div>
                                               <h4 className="font-bold text-slate-800">{route.vehicle_no}</h4>
                                               <p className="text-xs text-slate-500 font-semibold">{route.driver_name}</p>
+                                              {route.phone && <p className="text-[10px] text-stone-400 mt-1">📞 {route.phone}</p>}
                                           </div>
                                       </div>
                                   </div>
                               </div>
                           ))}
+                          {activeVehicles.length === 0 && <p className="col-span-full text-stone-400 text-center py-10 bg-stone-50 rounded-xl border border-dashed border-stone-200">No vehicles currently en-route.</p>}
                       </div>
                   </div>
               </div>
@@ -714,6 +762,21 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         )}
 
       </DashboardLayout>
+
+      {/* Live Tracking Modal */}
+      {liveTrackingModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setLiveTrackingModal(null)}>
+            <div className="w-full max-w-4xl h-[80vh] bg-stone-900 rounded-3xl overflow-hidden relative shadow-2xl border border-white/10" onClick={e => e.stopPropagation()}>
+                <button 
+                    onClick={() => setLiveTrackingModal(null)}
+                    className="absolute top-4 right-4 z-50 bg-black/50 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
+                >
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <TrackDriver embeddedId={liveTrackingModal} />
+            </div>
+        </div>
+      )}
 
       {/* Logout Confirmation Dialog */}
       {showLogoutDialog && (

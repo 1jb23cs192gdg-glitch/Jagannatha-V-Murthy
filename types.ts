@@ -150,6 +150,8 @@ export interface Vehicle {
   ngo_id: string;
   driver_name: string;
   vehicle_no: string;
+  phone?: string;
+  license?: string;
   status: 'IDLE' | 'EN_ROUTE' | 'LOADING' | 'MAINTENANCE';
   current_location?: string;
   destination?: string;
