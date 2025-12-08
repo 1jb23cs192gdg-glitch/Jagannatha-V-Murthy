@@ -208,15 +208,17 @@ const TempleDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   };
 
   const handleRateNgo = async () => {
-      if(!temple || !temple.ngoId) return alert("No Entity assigned to rate");
+      // Changed to rate Drying Unit instead of NGO
+      if(!temple || !temple.duId) return alert("No Drying Unit assigned to rate.");
+      
       await supabase.from('ratings').insert([{
           from_id: temple.id,
-          to_id: temple.ngoId || temple.duId,
+          to_id: temple.duId, // Explicitly target Drying Unit
           rating: ratingInput.rating,
           reason: ratingInput.reason,
           created_at: new Date().toISOString()
       }]);
-      alert("Feedback sent");
+      alert("Feedback sent to Drying Unit.");
       setRatingInput({ rating: 5, reason: '' });
   };
 

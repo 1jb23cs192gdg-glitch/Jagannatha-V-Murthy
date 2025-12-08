@@ -4,26 +4,10 @@ import { SHOPPING_URL } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 
 const Shop = () => {
-  const [shopUrl, setShopUrl] = useState(SHOPPING_URL);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchShopConfig = async () => {
-      try {
-        // Fetch dynamic URL set by admin, fallback to constant
-        const { data } = await supabase.from('site_config').select('url').eq('id', 'shop_url').single();
-        if (data && data.url) {
-          setShopUrl(data.url);
-        }
-      } catch (error) {
-        console.error("Error fetching shop config:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchShopConfig();
-  }, []);
+  // Direct link to the external Vercel shopping app
+  const DIRECT_SHOP_LINK = "https://shopping-cart-fy6b.vercel.app/login";
 
   return (
     <div className="min-h-screen bg-stone-50 py-12 px-4 flex flex-col items-center justify-center">
@@ -51,22 +35,18 @@ const Shop = () => {
                and <strong>Bio-Enzymes</strong> on our official e-commerce website.
              </p>
              
-             {loading ? (
-                <div className="animate-pulse bg-stone-200 h-12 w-48 rounded-full"></div>
-             ) : (
-                <a 
-                  href={shopUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-10 py-5 rounded-full font-bold text-xl hover:shadow-orange-500/40 shadow-xl transform hover:scale-105 transition-all flex items-center gap-2"
-                >
-                  Start Shopping Now 
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                </a>
-             )}
+             <a 
+               href={DIRECT_SHOP_LINK}
+               target="_blank"
+               rel="noreferrer"
+               className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-10 py-5 rounded-full font-bold text-xl hover:shadow-orange-500/40 shadow-xl transform hover:scale-105 transition-all flex items-center gap-2"
+             >
+               Start Shopping Now 
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+             </a>
 
              <p className="mt-6 text-sm text-stone-400">
-               You will be redirected to an external secure payment gateway.
+               You will be redirected to our secure shopping portal.
              </p>
            </div>
            

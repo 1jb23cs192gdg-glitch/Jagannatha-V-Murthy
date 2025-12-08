@@ -3,6 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { BowArrowLogo } from '../constants';
 import { supabase } from '../lib/supabaseClient';
+import { GoogleGenAI } from "@google/genai";
+
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
 
 interface TrackDriverProps {
   embeddedId?: string; // Optional prop for when used inside Dashboard
@@ -14,8 +21,11 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
   
   const [status, setStatus] = useState('CONNECTING');
   const [location, setLocation] = useState('Locating...');
+  const [groundedLocation, setGroundedLocation] = useState<string | null>(null);
+  const [routeInsight, setRouteInsight] = useState<string | null>(null);
   const [vehicleDetails, setVehicleDetails] = useState<any>(null);
   const [dots, setDots] = useState('');
+  const [isGrounding, setIsGrounding] = useState(false);
 
   // Animation for the "Live" indicator
   useEffect(() => {
@@ -40,7 +50,12 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
             
             if (data) {
                 setVehicleDetails(data);
-                setLocation(data.current_location || 'Unknown Location');
+                
+                // Only trigger Grounding if location changed significantly or first load
+                if (data.current_location !== location) {
+                    setLocation(data.current_location || 'Unknown Location');
+                    analyzeLogistics(data.current_location, data.destination);
+                }
                 
                 if (data.status === 'EN_ROUTE') setStatus('LIVE');
                 else if (data.status === 'LOADING') setStatus('LOADING');
@@ -64,10 +79,65 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
     return () => clearInterval(pollTimer);
   }, [id]);
 
+  const analyzeLogistics = async (rawLocation: string, destination?: string) => {
+      if (!rawLocation) return;
+      setIsGrounding(true);
+      try {
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          
+          let prompt = `Locate "${rawLocation}" precisely in India using Google Maps data. Return the most accurate formatted address for a map query.`;
+          
+          if (destination) {
+              prompt = `I am tracking a delivery vehicle. 
+              Current reported location: "${rawLocation}".
+              Destination: "${destination}".
+              
+              Task 1: Verify the current location precisely using Google Maps.
+              Task 2: Calculate the driving route, distance, and estimated time to the destination.
+              
+              Return a concise summary in this format:
+              "Verified at [Precise Address]. [Distance] km to destination ([Time] away)."`;
+          }
+
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: { tools: [{ googleMaps: {} }] },
+          });
+          
+          const resultText = response.text?.trim();
+          
+          if (resultText) {
+              // If we have a destination, the result is complex (Insight), otherwise it's just an address
+              if (destination) {
+                  // Heuristic: If it contains "Verified at", use the full text as insight
+                  // and try to extract the address part for the map
+                  setRouteInsight(resultText);
+                  
+                  // Simple extraction attempt for map pin (everything before first period or comma if plausible)
+                  // This is a basic fallback; usually the whole text is too long for a map query.
+                  // For map query, we might stick to raw location or try to extract.
+                  // Let's use the Raw Location grounded by the first sentence if possible.
+                  const firstPart = resultText.split('.')[0].replace('Verified at', '').trim();
+                  setGroundedLocation(firstPart.length > 5 ? firstPart : rawLocation);
+              } else {
+                  setGroundedLocation(resultText);
+                  setRouteInsight(null);
+              }
+          }
+      } catch (error) {
+          console.error("Grounding failed:", error);
+      } finally {
+          setIsGrounding(false);
+      }
+  };
+
   // Conditional styles based on whether it's a full page or embedded
   const containerClass = embeddedId 
     ? "w-full h-full relative overflow-hidden bg-stone-900 text-white rounded-2xl"
     : "min-h-screen bg-stone-900 text-white flex flex-col relative overflow-hidden";
+
+  const mapQuery = groundedLocation || location;
 
   return (
     <div className={containerClass}>
@@ -79,7 +149,7 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
           height="100%" 
           frameBorder="0" 
           scrolling="no" 
-          src={`https://maps.google.com/maps?q=${encodeURIComponent(location)}&t=m&z=14&ie=UTF8&iwloc=&output=embed`}
+          src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&t=m&z=14&ie=UTF8&iwloc=&output=embed`}
           title="Driver Location"
           style={{ filter: 'grayscale(100%) invert(90%)' }}
         ></iframe>
@@ -107,6 +177,26 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
           </div>
         </div>
 
+        {/* Route Insight Card (New) */}
+        {vehicleDetails?.destination && (
+            <div className="mb-4 animate-fade-in">
+                <div className="bg-blue-600/20 backdrop-blur-md border border-blue-500/30 p-4 rounded-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                    <div className="flex justify-between items-start mb-1">
+                        <h3 className="text-sm font-bold text-blue-200 uppercase tracking-wider flex items-center gap-2">
+                            <span>🗺️</span> AI Route Analysis
+                        </h3>
+                        {isGrounding && <span className="text-[10px] text-blue-300 animate-pulse">Updating...</span>}
+                    </div>
+                    {routeInsight ? (
+                        <p className="text-white font-medium text-sm leading-relaxed">{routeInsight}</p>
+                    ) : (
+                        <p className="text-blue-300/70 text-xs italic">Calculating route to {vehicleDetails.destination}...</p>
+                    )}
+                </div>
+            </div>
+        )}
+
         {/* Center Info (Spacer) */}
         <div className="flex-1"></div>
 
@@ -115,8 +205,15 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
            
            <div className="flex justify-between items-center border-b border-white/10 pb-4">
               <div className="max-w-[70%]">
-                <p className="text-stone-400 text-xs uppercase font-bold mb-1">Current Location</p>
-                <h2 className="text-xl font-bold text-white truncate">{location}</h2>
+                <div className="flex items-center gap-2 mb-1">
+                    <p className="text-stone-400 text-xs uppercase font-bold">Current Location</p>
+                    {groundedLocation && !isGrounding && (
+                        <span className="bg-green-500/20 text-green-400 text-[10px] px-1.5 py-0.5 rounded border border-green-500/30 flex items-center gap-1">
+                            ✓ Verified
+                        </span>
+                    )}
+                </div>
+                <h2 className="text-xl font-bold text-white truncate">{mapQuery}</h2>
               </div>
               <div className="text-right">
                 <p className="text-stone-400 text-xs uppercase font-bold mb-1">Vehicle</p>
@@ -130,8 +227,8 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
                  <p className="text-lg font-mono font-bold text-white truncate">{vehicleDetails?.driver_name || 'Unassigned'}</p>
               </div>
               <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                 <p className="text-xs text-stone-400 mb-1">Status</p>
-                 <p className="text-lg font-mono font-bold text-white">{vehicleDetails?.status || '--'}</p>
+                 <p className="text-xs text-stone-400 mb-1">Destination</p>
+                 <p className="text-lg font-mono font-bold text-white truncate">{vehicleDetails?.destination || 'Not Set'}</p>
               </div>
            </div>
 
@@ -145,7 +242,7 @@ const TrackDriver: React.FC<TrackDriverProps> = ({ embeddedId }) => {
            )}
 
            <p className="text-center text-[10px] text-stone-500">
-             Data Source: Firebase Realtime Database • Encrypted
+             Powered by Gemini Maps Grounding
            </p>
         </div>
 

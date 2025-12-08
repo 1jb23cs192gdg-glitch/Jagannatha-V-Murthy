@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { PickupRequest, InventoryItem, Vehicle, QueryTicket, User, Temple, StockRequest, VolunteerRequest, VolunteerDuty } from '../../types';
 import DashboardLayout from '../../components/DashboardLayout';
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area
+  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { GoogleGenAI } from "@google/genai";
 import TrackDriver from '../TrackDriver'; 
@@ -48,7 +48,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [liveTrackingModal, setLiveTrackingModal] = useState<string | null>(null); 
 
   // Updated Vehicle State for new driver fields
-  const [newVehicle, setNewVehicle] = useState({ driver: '', vehicleNo: '', phone: '', license: '' });
+  const [newVehicle, setNewVehicle] = useState({ driver: '', vehicleNo: '', phone: '', license: '', destination: '' });
   const [newItem, setNewItem] = useState({ name: '', stock: 0, price: 0 }); 
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
@@ -326,10 +326,11 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           vehicle_no: newVehicle.vehicleNo, 
           phone: newVehicle.phone,
           license: newVehicle.license,
+          destination: newVehicle.destination || '', // New field for route tracking
           status: 'IDLE', 
           current_location: 'Drying Unit Hub'
       }]);
-      setNewVehicle({ driver: '', vehicleNo: '', phone: '', license: '' });
+      setNewVehicle({ driver: '', vehicleNo: '', phone: '', license: '', destination: '' });
       alert("New Driver & Vehicle Added Successfully!");
       fetchRoutes();
   };
@@ -355,14 +356,21 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       }
   };
 
-  const handleTrackVehicle = async (vehicleId: string, location: string | undefined) => {
+  const handleTrackVehicle = async (vehicleId: string, location: string | undefined, destination?: string) => {
       if (!location) return;
       setLoadingLocations(prev => ({...prev, [vehicleId]: true}));
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          
+          let prompt = `Locate "${location}" precisely in India using Google Maps data. Return the precise address formatted for a map query.`;
+          
+          if (destination) {
+              prompt += ` Context: Vehicle is traveling to "${destination}".`;
+          }
+
           const response = await ai.models.generateContent({
               model: 'gemini-2.5-flash',
-              contents: `Locate "${location}" precisely in India. Return the formatted address.`,
+              contents: prompt,
               config: { tools: [{ googleMaps: {} }] },
           });
           let groundedLocation = response.text?.trim() || location;
@@ -388,6 +396,28 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
   if (!currentUser) return <div className="p-20 text-center">Loading Drying Unit...</div>;
   const activeVehicles = routes.filter(v => v.status === 'EN_ROUTE' || v.status === 'LOADING');
+
+  // Analytics Helpers
+  const getUserWasteTimeSeries = () => {
+      const userPickups = pickups.filter(p => p.requester_type === 'USER' && p.status === 'COMPLETED');
+      const agg: Record<string, number> = {};
+      userPickups.forEach(p => {
+          const date = p.scheduled_date; 
+          agg[date] = (agg[date] || 0) + (Number(p.estimated_weight) || 0);
+      });
+      return Object.keys(agg).sort().map(date => ({
+          date: new Date(date).toLocaleDateString(undefined, {month:'short', day:'numeric'}),
+          weight: agg[date]
+      }));
+  };
+
+  const templeTotalWaste = assignedTemples.reduce((sum, t) => sum + (Number(t.wasteDonatedKg) || 0), 0);
+  const userTotalWaste = assignedUsers.reduce((sum, u) => sum + (Number(u.waste_donated_kg) || 0), 0);
+  
+  const sourceDistribution = [
+      { name: 'Temples', value: templeTotalWaste, color: '#f97316' },
+      { name: 'Households', value: userTotalWaste, color: '#3b82f6' }
+  ];
 
   return (
     <>
@@ -445,6 +475,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             </div>
         )}
 
+        {/* ... Rest of VOLUNTEERS, ASSIGNMENTS, QUERIES, WAREHOUSE, HISTORY, ANALYTICS tabs remain identical ... */}
         {activeTab === 'VOLUNTEERS' && (
             <div className="space-y-6">
                 {/* 1. Pending Duty Verification */}
@@ -609,7 +640,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             </div>
         )}
 
-        {/* ... Rest of tabs (QUERIES, WAREHOUSE, HISTORY, ANALYTICS, LOGISTICS, SETTINGS) remain mostly unchanged ... */}
+        {/* ... QUERIES, WAREHOUSE, HISTORY, ANALYTICS tabs remain identical ... */}
         {activeTab === 'QUERIES' && (
               <div className="glass-panel p-6 rounded-3xl">
                   <h3 className="font-bold text-slate-700 mb-6">Received Queries</h3>
@@ -719,17 +750,77 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'ANALYTICS' && (
             <div className="space-y-6">
-                 <div className="glass-panel p-6 rounded-3xl h-96">
-                      <h3 className="font-bold text-slate-700 mb-4">Temple Waste Contribution</h3>
-                      <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={assignedTemples.map(t => ({ name: t.name.split(' ')[0], waste: Number(t.wasteDonatedKg) || 0 }))}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                              <XAxis dataKey="name" tick={{fontSize:10}} />
-                              <YAxis />
-                              <RechartsTooltip cursor={{fill: 'transparent'}} />
-                              <Bar dataKey="waste" fill="#f97316" radius={[4,4,0,0]} name="Waste (kg)" />
-                          </BarChart>
-                      </ResponsiveContainer>
+                 {/* Top Row: Temple & User Graphs */}
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                     {/* Existing Temple Graph */}
+                     <div className="glass-panel p-6 rounded-3xl h-96">
+                          <h3 className="font-bold text-slate-700 mb-4">Temple Waste Contribution</h3>
+                          <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={assignedTemples.map(t => ({ name: t.name.split(' ')[0], waste: Number(t.wasteDonatedKg) || 0 }))}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                  <XAxis dataKey="name" tick={{fontSize:10}} />
+                                  <YAxis />
+                                  <RechartsTooltip cursor={{fill: 'transparent'}} />
+                                  <Bar dataKey="waste" fill="#f97316" radius={[4,4,0,0]} name="Waste (kg)" />
+                              </BarChart>
+                          </ResponsiveContainer>
+                     </div>
+
+                     {/* New User Trend Graph */}
+                     <div className="glass-panel p-6 rounded-3xl h-96">
+                          <h3 className="font-bold text-slate-700 mb-4">User Waste Trends (Daily)</h3>
+                          <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={getUserWasteTimeSeries()}>
+                                  <defs>
+                                      <linearGradient id="colorUserWaste" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                      </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                  <XAxis dataKey="date" tick={{fontSize:10}} />
+                                  <YAxis />
+                                  <RechartsTooltip />
+                                  <Area type="monotone" dataKey="weight" stroke="#3b82f6" fillOpacity={1} fill="url(#colorUserWaste)" name="Collected (kg)" />
+                              </AreaChart>
+                          </ResponsiveContainer>
+                     </div>
+                 </div>
+
+                 {/* Bottom Row: Source Distribution Pie */}
+                 <div className="glass-panel p-6 rounded-3xl h-80">
+                      <h3 className="font-bold text-slate-700 mb-4">Total Waste Source Distribution</h3>
+                      <div className="flex h-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                  <Pie
+                                      data={sourceDistribution}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={60}
+                                      outerRadius={80}
+                                      paddingAngle={5}
+                                      dataKey="value"
+                                  >
+                                      {sourceDistribution.map((entry, index) => (
+                                          <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                  </Pie>
+                                  <RechartsTooltip />
+                                  <Legend verticalAlign="middle" align="right" />
+                              </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex flex-col justify-center gap-4 pr-10">
+                              <div className="text-center">
+                                  <p className="text-xs text-stone-500 uppercase font-bold">Temples</p>
+                                  <p className="text-2xl font-bold text-orange-500">{templeTotalWaste.toFixed(1)} kg</p>
+                              </div>
+                              <div className="text-center">
+                                  <p className="text-xs text-stone-500 uppercase font-bold">Households</p>
+                                  <p className="text-2xl font-bold text-blue-500">{userTotalWaste.toFixed(1)} kg</p>
+                              </div>
+                          </div>
+                      </div>
                  </div>
             </div>
         )}
@@ -739,7 +830,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                   {/* Fleet Management - Create Driver */}
                   <div className="glass-panel p-6 rounded-3xl">
                       <h3 className="font-bold text-slate-800 text-xl mb-4">Fleet & Driver Management</h3>
-                      <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
+                      <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 mb-6">
                           <h4 className="text-sm font-bold text-stone-600 mb-3 uppercase tracking-wide">Add New Driver</h4>
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                               <input 
@@ -766,10 +857,45 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                   value={newVehicle.license} 
                                   onChange={e => setNewVehicle({...newVehicle, license: e.target.value})} 
                               />
+                              {/* New Destination Field */}
+                              <input 
+                                  placeholder="Assigned Route/Destination" 
+                                  className="p-3 rounded-xl border border-stone-200 text-sm md:col-span-4" 
+                                  value={newVehicle.destination} 
+                                  onChange={e => setNewVehicle({...newVehicle, destination: e.target.value})} 
+                              />
                           </div>
                           <button onClick={handleAddVehicle} className="bg-slate-800 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors w-full md:w-auto">
                               + Create Driver Profile
                           </button>
+                      </div>
+
+                      {/* Driver List Display - FIX: Show all drivers immediately */}
+                      <div className="mt-6">
+                          <div className="flex justify-between items-center mb-3">
+                              <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Driver Directory ({routes.length})</h4>
+                              <button onClick={fetchRoutes} className="text-xs text-blue-500 hover:underline">Refresh List</button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto">
+                              {routes.map(v => (
+                                  <div key={v.id} className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex flex-col gap-2">
+                                      <div className="flex justify-between items-start">
+                                          <div>
+                                              <p className="font-bold text-slate-800 text-sm">{v.driver_name}</p>
+                                              <p className="text-xs text-stone-500 font-mono">{v.vehicle_no}</p>
+                                          </div>
+                                          <span className={`text-[10px] font-bold px-2 py-1 rounded ${v.status === 'IDLE' ? 'bg-slate-100 text-slate-500' : 'bg-green-100 text-green-600'}`}>
+                                              {v.status}
+                                          </span>
+                                      </div>
+                                      <div className="text-xs text-stone-500">
+                                          {v.phone && <p>📞 {v.phone}</p>}
+                                          {v.destination && <p>📍 {v.destination}</p>}
+                                      </div>
+                                  </div>
+                              ))}
+                              {routes.length === 0 && <p className="text-stone-400 text-sm italic col-span-full text-center py-4">No drivers added yet.</p>}
+                          </div>
                       </div>
                   </div>
 
@@ -803,7 +929,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                           {route.status}
                                       </div>
                                       <div className="absolute bottom-3 right-3 flex gap-2">
-                                          <button onClick={() => handleTrackVehicle(route.id, route.current_location)} disabled={loadingLocations[route.id]} className="bg-white text-stone-800 px-4 py-2 rounded-lg text-xs font-bold shadow-lg hover:bg-stone-100 transition-colors flex items-center gap-2 border border-stone-200">
+                                          <button onClick={() => handleTrackVehicle(route.id, route.current_location, route.destination)} disabled={loadingLocations[route.id]} className="bg-white text-stone-800 px-4 py-2 rounded-lg text-xs font-bold shadow-lg hover:bg-stone-100 transition-colors flex items-center gap-2 border border-stone-200">
                                               {loadingLocations[route.id] ? <span className="animate-spin">⌛</span> : <span>🎯</span>} Update
                                           </button>
                                           <button onClick={() => setLiveTrackingModal(route.id)} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg hover:bg-black transition-colors flex items-center gap-2">
@@ -818,6 +944,12 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                               <p className="text-xs text-slate-500 font-semibold">{route.driver_name}</p>
                                               {route.phone && <p className="text-[10px] text-stone-400 mt-1">📞 {route.phone}</p>}
                                           </div>
+                                          {route.destination && (
+                                              <div className="text-right">
+                                                  <p className="text-[10px] text-stone-400 uppercase font-bold">Destination</p>
+                                                  <p className="text-xs font-bold text-blue-600">{route.destination}</p>
+                                              </div>
+                                          )}
                                       </div>
                                   </div>
                               </div>
@@ -848,6 +980,18 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
                 <TrackDriver embeddedId={liveTrackingModal} />
+            </div>
+        </div>
+      )}
+
+      {/* Proof Photo Modal */}
+      {viewingProof && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setViewingProof(null)}>
+            <div className="bg-white p-2 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden relative shadow-2xl" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setViewingProof(null)} className="absolute top-2 right-2 z-10 bg-stone-100 rounded-full p-2 hover:bg-red-100 text-stone-600 hover:text-red-600 shadow-md">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <img src={viewingProof} alt="Proof" className="w-full h-full object-contain rounded-lg" />
             </div>
         </div>
       )}

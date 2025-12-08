@@ -20,7 +20,16 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Data State
-  const [stats, setStats] = useState({ waste: 0, coins: 0, users: 0, dus: 0, temples: 0, pending: 0 });
+  const [stats, setStats] = useState({ 
+      waste: 0, 
+      coins: 0, 
+      users: 0, 
+      dus: 0, 
+      temples: 0, 
+      pending: 0,
+      ngos: 0,
+      volunteers: 0
+  });
   const [users, setUsers] = useState<any[]>([]);
   const [dus, setDus] = useState<any[]>([]); // Drying Units (Old NGOs)
   const [ngos, setNgos] = useState<any[]>([]); // New Partner NGOs
@@ -65,6 +74,17 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     fetchAllData();
   }, []);
 
+  // Auto-refresh lists when switching to ALLOCATION tab to ensure data consistency
+  useEffect(() => {
+      if (activeTab === 'ALLOCATION') {
+          fetchDryingUnits();
+          fetchUsers();
+          fetchTempleStats();
+          fetchActiveVolunteers();
+          fetchPartnerNgos();
+      }
+  }, [activeTab]);
+
   useEffect(() => {
     const wasteFromPickups = pickups.filter(p => p.status === 'COMPLETED').reduce((acc, p) => acc + (Number(p.estimated_weight) || 0), 0);
     const totalCoins = Math.floor(wasteFromPickups * coinRate);
@@ -76,9 +96,11 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         users: users.length, 
         dus: dus.length,
         temples: templeStats.length,
-        pending: pendingTotal
+        pending: pendingTotal,
+        ngos: ngos.length,
+        volunteers: activeVolunteers.length
     });
-  }, [pickups, users, dus, templeStats, pendingDus, coinRate]);
+  }, [pickups, users, dus, templeStats, pendingDus, coinRate, ngos, activeVolunteers]);
 
   const fetchAllData = () => {
     fetchUsers();
@@ -353,6 +375,9 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     { id: 'SETTINGS', label: 'Settings', icon: '⚙️' },
   ];
 
+  // Helper for filtering available volunteers
+  const availableVolunteers = activeVolunteers.filter(v => v.assignment_status !== 'ACCEPTED');
+
   return (
     <>
       <DashboardLayout 
@@ -381,6 +406,20 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                   <div className="glass-card p-6 rounded-3xl border-l-4 border-red-500 cursor-pointer" onClick={() => setActiveTab('VERIFICATION')}>
                       <p className="text-stone-500 text-xs font-bold uppercase">Pending DUs</p>
                       <p className="text-3xl font-bold mt-2 text-red-600">{stats.pending}</p>
+                  </div>
+                  
+                  {/* New Stats Cards */}
+                  <div className="glass-card p-6 rounded-3xl border-l-4 border-purple-500">
+                      <p className="text-stone-500 text-xs font-bold uppercase">Total Users</p>
+                      <p className="text-3xl font-bold mt-2 text-stone-800">{stats.users}</p>
+                  </div>
+                  <div className="glass-card p-6 rounded-3xl border-l-4 border-teal-500">
+                      <p className="text-stone-500 text-xs font-bold uppercase">Total NGOs</p>
+                      <p className="text-3xl font-bold mt-2 text-stone-800">{stats.ngos}</p>
+                  </div>
+                  <div className="glass-card p-6 rounded-3xl border-l-4 border-yellow-500">
+                      <p className="text-stone-500 text-xs font-bold uppercase">Total Volunteers</p>
+                      <p className="text-3xl font-bold mt-2 text-stone-800">{stats.volunteers}</p>
                   </div>
               </div>
           )}
@@ -654,12 +693,18 @@ const AdminDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           )}
                           {allocation.type === 'VOLUNTEER_TO_DU' && (
                               <div className="space-y-4">
-                                  <label className="block text-xs font-bold text-slate-400 uppercase">Select Approved Volunteer</label>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase">
+                                      Select Approved Volunteer ({availableVolunteers.length})
+                                  </label>
                                   <select className="w-full p-3 rounded-xl border" value={allocation.sourceId} onChange={(e) => setAllocation({...allocation, sourceId: e.target.value})}>
                                       <option value="">-- Choose Volunteer --</option>
-                                      {activeVolunteers.filter(v => v.assignment_status !== 'ACCEPTED').map(v => (
-                                          <option key={v.id} value={v.id}>{v.full_name} ({v.district})</option>
-                                      ))}
+                                      {availableVolunteers.length > 0 ? (
+                                          availableVolunteers.map(v => (
+                                              <option key={v.id} value={v.id}>{v.full_name} ({v.district})</option>
+                                          ))
+                                      ) : (
+                                          <option disabled>No unassigned approved volunteers found</option>
+                                      )}
                                   </select>
                                   <label className="block text-xs font-bold text-slate-400 uppercase">Assign to Drying Unit</label>
                                   <select className="w-full p-3 rounded-xl border" value={allocation.targetId} onChange={(e) => setAllocation({...allocation, targetId: e.target.value})}>

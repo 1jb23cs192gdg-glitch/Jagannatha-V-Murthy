@@ -238,39 +238,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       return true;
   }
 
-  const handleGoogleLogin = async () => {
-    setErrorMsg(null);
-    setLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-      
-      if (error) {
-          throw error;
-      }
-
-      // If we are here, redirect or session handling happens. 
-      // In a real app, OAuth redirects. In this mock, we might get immediate data if simulated.
-      if (data?.user) {
-          await processLoginSuccess(data.user);
-      } else {
-        // Wait for auth state change in App.tsx if redirect happens, but here we can try to fetch user
-        const { data: userCheck } = await supabase.auth.getUser();
-        if (userCheck?.user) {
-           await processLoginSuccess(userCheck.user);
-        } else {
-           // If simulation fails to auto-login
-           // setErrorMsg("Login flow initiated. Please check popups.");
-        }
-      }
-
-    } catch (error: any) {
-      console.error("Google Login Exception:", error);
-      setErrorMsg("Google Login failed. Please try again.");
-      setLoading(false);
-    }
-  };
-
   const handleAuth = async () => {
     setErrorMsg(null);
     setLoading(true);
@@ -444,26 +411,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                  </div>
                )}
                
-               <button 
-                 onClick={handleGoogleLogin}
-                 disabled={loading}
-                 className="w-full bg-white text-stone-700 border border-stone-200 font-bold py-3.5 rounded-xl hover:bg-stone-50 transition-all shadow-sm hover:shadow-md flex justify-center items-center gap-3 text-sm"
-               >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="currentColor"
-                      d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-1.81-.15-1.81Z"
-                    />
-                  </svg>
-                  Continue with Google
-               </button>
-
-               <div className="relative flex py-2 items-center">
-                   <div className="flex-grow border-t border-stone-200"></div>
-                   <span className="flex-shrink-0 mx-4 text-xs text-stone-400 font-bold uppercase">Or with email</span>
-                   <div className="flex-grow border-t border-stone-200"></div>
-               </div>
-
                {isRegistering && activeTab !== UserRole.ADMIN && (
                  <div className="space-y-2">
                     <label className="text-xs font-bold text-stone-500 uppercase ml-1">Full Name / Org Name</label>
