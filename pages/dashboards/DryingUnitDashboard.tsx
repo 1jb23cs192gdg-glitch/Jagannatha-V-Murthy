@@ -86,6 +86,17 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       }
   }, [currentUser, activeTab]);
   
+  // Real-time updates for logistics
+  useEffect(() => {
+      let interval: any;
+      if (currentUser && activeTab === 'LOGISTICS') {
+          interval = setInterval(() => {
+              fetchRoutes(); // Poll routes to update live locations
+          }, 10000); // 10s poll
+      }
+      return () => { if(interval) clearInterval(interval); };
+  }, [currentUser, activeTab]);
+
   const fetchPickups = async () => { 
       if (!currentUser) return;
       const { data } = await supabase.from('pickup_requests').select('*').eq('ngo_id', currentUser.id);
@@ -176,8 +187,6 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         .eq('status', 'COMPLETION_REQUESTED');
       
       if (data) {
-          // Join with Volunteer Request to get name if possible, or just display ID
-          // For simplicity in this demo, assuming we display ID or fetch names
           setPendingDuties(data);
       }
   }
@@ -311,12 +320,6 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     alert("Reply sent and logged.");
   };
 
-  const generateTrackingLink = () => {
-      const trackingId = Math.random().toString(36).substring(7);
-      const fullUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname.replace(/\/$/, '')}/#/track/${trackingId}`;
-      return { id: trackingId, url: fullUrl };
-  };
-
   const handleAddVehicle = async () => {
       if (!currentUser || !newVehicle.driver || !newVehicle.vehicleNo) return alert("Fill Driver Name and Vehicle No.");
       
@@ -332,6 +335,19 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       }]);
       setNewVehicle({ driver: '', vehicleNo: '', phone: '', license: '', destination: '' });
       alert("New Driver & Vehicle Added Successfully!");
+      fetchRoutes();
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+      if(window.confirm("Are you sure you want to permanently delete this driver and vehicle from the system?")) {
+          await supabase.from('vehicles').delete().eq('id', id);
+          alert("Driver Removed.");
+          fetchRoutes();
+      }
+  };
+
+  const handleUpdateVehicleStatus = async (id: string, newStatus: string) => {
+      await supabase.from('vehicles').update({ status: newStatus }).eq('id', id);
       fetchRoutes();
   };
 
@@ -387,7 +403,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       { id: 'VOLUNTEERS', label: 'Volunteers', icon: '🙌' },
       { id: 'ASSIGNMENTS', label: 'Assignments', icon: '📋' },
       { id: 'QUERIES', label: 'Queries', icon: '💬' },
-      { id: 'WAREHOUSE', label: 'Warehouse Stock', icon: '🏭' }, // Inventory + Stock Request Mgmt
+      { id: 'WAREHOUSE', label: 'Warehouse Stock', icon: '🏭' }, 
       { id: 'HISTORY', label: 'History', icon: '📜' },
       { id: 'ANALYTICS', label: 'Analytics', icon: '📊' },
       { id: 'LOGISTICS', label: 'Logistics', icon: '🗺️' },
@@ -857,7 +873,6 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                   value={newVehicle.license} 
                                   onChange={e => setNewVehicle({...newVehicle, license: e.target.value})} 
                               />
-                              {/* New Destination Field */}
                               <input 
                                   placeholder="Assigned Route/Destination" 
                                   className="p-3 rounded-xl border border-stone-200 text-sm md:col-span-4" 
@@ -870,7 +885,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           </button>
                       </div>
 
-                      {/* Driver List Display - FIX: Show all drivers immediately */}
+                      {/* Driver List Display */}
                       <div className="mt-6">
                           <div className="flex justify-between items-center mb-3">
                               <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Driver Directory ({routes.length})</h4>
@@ -878,20 +893,41 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto">
                               {routes.map(v => (
-                                  <div key={v.id} className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex flex-col gap-2">
+                                  <div key={v.id} className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex flex-col gap-2 relative group">
                                       <div className="flex justify-between items-start">
                                           <div>
                                               <p className="font-bold text-slate-800 text-sm">{v.driver_name}</p>
                                               <p className="text-xs text-stone-500 font-mono">{v.vehicle_no}</p>
                                           </div>
-                                          <span className={`text-[10px] font-bold px-2 py-1 rounded ${v.status === 'IDLE' ? 'bg-slate-100 text-slate-500' : 'bg-green-100 text-green-600'}`}>
-                                              {v.status}
-                                          </span>
+                                          
+                                          {/* Status Change Dropdown */}
+                                          <select 
+                                              className={`text-[10px] font-bold px-2 py-1 rounded outline-none border ${
+                                                  v.status === 'IDLE' ? 'bg-slate-100 text-slate-500 border-slate-200' : 
+                                                  v.status === 'EN_ROUTE' ? 'bg-green-50 text-green-600 border-green-200' :
+                                                  'bg-blue-50 text-blue-600 border-blue-200'
+                                              }`}
+                                              value={v.status}
+                                              onChange={(e) => handleUpdateVehicleStatus(v.id, e.target.value)}
+                                          >
+                                              <option value="IDLE">IDLE</option>
+                                              <option value="EN_ROUTE">EN ROUTE</option>
+                                              <option value="LOADING">LOADING</option>
+                                          </select>
                                       </div>
                                       <div className="text-xs text-stone-500">
                                           {v.phone && <p>📞 {v.phone}</p>}
                                           {v.destination && <p>📍 {v.destination}</p>}
                                       </div>
+                                      
+                                      {/* Delete Button */}
+                                      <button 
+                                          onClick={() => handleDeleteVehicle(v.id)} 
+                                          className="absolute bottom-2 right-2 text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          title="Delete Driver"
+                                      >
+                                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                      </button>
                                   </div>
                               ))}
                               {routes.length === 0 && <p className="text-stone-400 text-sm italic col-span-full text-center py-4">No drivers added yet.</p>}
@@ -920,6 +956,7 @@ const DryingUnitDashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                                           height="100%" 
                                           frameBorder="0" 
                                           scrolling="no" 
+                                          // Prioritize grounded location, fallback to current_location from polling
                                           src={`https://maps.google.com/maps?q=${encodeURIComponent(vehicleLocations[route.id] || route.current_location || 'India')}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
                                           title={`Tracking ${route.vehicle_no}`}
                                           className="opacity-90 group-hover:opacity-100 transition-opacity"
